@@ -25,8 +25,9 @@ running on free tiers end to end (Workers Free, Access Free ≤ 50 users).
   device flow. Commits made through the CMS are attributed to the bot.
 - **Tokens are short-lived by design:** the worker keeps the bot's refresh
   token in a Durable Object and rotates it on a cron (00/06/12/18 UTC).
-  Browsers only ever hold a token that dies within 8 hours — extracting it
-  from `localStorage` buys an attacker almost nothing.
+  Browsers only ever hold a token that dies within 8 hours, which bounds how
+  long a leaked token is usable — but within that window it is the bot's full
+  GitHub token (repo read/write), not a CMS-scoped one, so treat a leak as real.
 - **Zero GitHub secrets in the worker config.** The only secret material (the
   refresh token) is created during setup and never leaves the Durable Object.
 - **Two gates against abuse:** requests must carry your site's `site_id`
@@ -63,9 +64,13 @@ What that means for you as the operator:
 **Token lifetimes and where tokens live:**
 
 - The token handed to an editor's browser **expires after 8 hours**. Like every
-  git-based CMS, Sveltia keeps it in the browser's `localStorage` unencrypted —
-  but its short life means a leaked or copied token is worthless within hours,
-  and needs no manual revocation.
+  git-based CMS, Sveltia keeps it in the browser's `localStorage` unencrypted.
+  The short life bounds the exposure window, but the token is the bot's full
+  GitHub token (repo read/write, not limited to CMS actions): a leaked token can
+  read or write the repo directly for those hours, and anything it commits
+  persists after it expires. Keep the blast radius small — one dedicated bot,
+  minimal GitHub App permissions, collaborator on only the target repo — and
+  rotate immediately on a suspected leak (see offboarding below).
 - The service refreshes the bot token automatically four times a day
   (00/06/12/18 UTC) and renews the underlying refresh token on every rotation,
   so nothing ever reaches GitHub's 6-month refresh-token expiry — even if the
@@ -76,14 +81,24 @@ What that means for you as the operator:
 
 **Removing access (offboarding):** delete the person from the Access policy.
 They lose access after at most *(Access session length, default 1 week) + 8
-hours*. To cut everyone off immediately — e.g. on a suspected leak — click
-*Rotate token now* in the dashboard; every outstanding token stops working at
-once. Shortening the Access session length reduces the offboarding delay.
+hours*. On a suspected leak, click *Rotate token now* in the dashboard: GitHub
+invalidates the previously issued bot token immediately, so any copied bot token
+stops working. Note what rotation does **not** do — it does not end Cloudflare
+Access sessions (an editor still signed in can fetch a fresh token, so remove
+them from the Access policy too) and does not touch personal GitHub sign-in
+tokens. Shortening the Access session length reduces the offboarding delay.
 
 **Abuse protection:** requests must carry an allowed `site_id`
 (`ALLOWED_DOMAINS`) and tokens are only delivered to allowed origins; an empty
 list disables login entirely (no open relay). The admin area is restricted to
 the `SETUP_ADMINS` emails.
+
+**During first-time setup (before you pin the app):** the wizard trusts your
+signed-in Access session on first use to read the app's audience (AUD) tag. Until
+you confirm it in step 1, `/setup` accepts any `SETUP_ADMINS` session from your
+Access *team* — not only this app. If your Access team also hosts other, less
+restrictive apps, finish the wizard's first step (pin the AUD) before relying on
+it; once pinned, only this app's sessions are accepted everywhere.
 
 **The personal-GitHub alternative.** If you enable the optional GitHub sign-in
 path (delegated to `sveltia-cms-auth`, see below), editors using it sign in with
