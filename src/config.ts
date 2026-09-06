@@ -48,9 +48,11 @@ function parseList(raw: string | undefined): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-/** Env-Fallback-Parsing von `ALLOWED_DOMAINS` (kommagetrennt). */
+/** Env-Fallback-Parsing von `ALLOWED_DOMAINS` (kommagetrennt); verwirft
+ * Einträge, die keine reinen Hostnamen sind — gleiche Validierung wie im Wizard,
+ * damit kein ungültiger Wert in die Origin-Allowlist gelangt. */
 export function parseAllowedDomains(raw: string | undefined): string[] {
-  return parseList(raw);
+  return parseList(raw).filter((entry) => isValidHostname(entry));
 }
 
 /**

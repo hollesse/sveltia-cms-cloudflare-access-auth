@@ -444,9 +444,9 @@ export function renderCallbackSuccessPage(
   t: Texts,
 ): Response {
   const script = `(function () {
-  var provider = ${JSON.stringify(payload.provider)};
-  var payload = ${JSON.stringify(payload)};
-  var allowedOrigins = ${JSON.stringify(buildAllowedOrigins(allowedDomains))};
+  var provider = ${scriptJson(payload.provider)};
+  var payload = ${scriptJson(payload)};
+  var allowedOrigins = ${scriptJson(buildAllowedOrigins(allowedDomains))};
 
   if (!window.opener) { return; }
 
@@ -484,8 +484,8 @@ export function renderCallbackErrorPage(
 ): Response {
   const script = `(function () {
   var provider = 'github';
-  var errorPayload = { provider: provider, error: ${JSON.stringify(message)} };
-  var allowedOrigins = ${JSON.stringify(buildAllowedOrigins(allowedDomains))};
+  var errorPayload = { provider: provider, error: ${scriptJson(message)} };
+  var allowedOrigins = ${scriptJson(buildAllowedOrigins(allowedDomains))};
 
   if (!window.opener) { return; }
 
@@ -1228,4 +1228,13 @@ function escapeHtml(value: string): string {
 
 function escapeHtmlAttribute(value: string): string {
   return escapeHtml(value).replaceAll('"', '&quot;');
+}
+
+/**
+ * JSON zum Einbetten in einen `<script>`-Block: neutralisiert `<`, damit ein
+ * Wert wie `</script>` den Block nicht schliessen kann. (Reguläre Werte —
+ * Tokens, validierte Origins — enthalten kein `<`; das ist Defense-in-Depth.)
+ */
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
