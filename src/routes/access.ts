@@ -48,10 +48,11 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
   const url = new URL(request.url);
   const siteId = url.searchParams.get('site_id') ?? '';
 
-  // Uebergabe-Gate (NFR-1) fuer den site_id-Parameter dieser Route; das
-  // eigentliche Uebergabe-Gate fuer den postMessage-Empfaenger-Origin
-  // ist clientseitig in der Antwortseite eingebettet (allowedDomains).
-  if (siteId !== '' && !isAllowedDomain(siteId, config.allowedDomains)) {
+  // Eingangs-Gate (NFR-1) fuer den site_id-Parameter dieser Route — konsistent
+  // zu `/auth`: ein fehlender oder nicht erlaubter `site_id` wird abgelehnt (kein
+  // stilles Ueberspringen). Das eigentliche Token-Uebergabe-Gate bleibt der
+  // exakte postMessage-Empfaenger-Origin-Check in der Antwortseite.
+  if (!isAllowedDomain(siteId, config.allowedDomains)) {
     return renderUnsupportedDomainPage(t);
   }
 
