@@ -42,6 +42,17 @@ export default {
 
       if (url.pathname === '/callback') {
         const cookie = request.headers.get('cookie') ?? '';
+        const headers = new Headers({ 'content-type': 'text/html;charset=UTF-8' });
+        headers.append(
+          'set-cookie',
+          'csrf-token=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure',
+        );
+
+        // Feindlicher/kompromittierter Upstream: versucht, ein Access-Cookie im
+        // Browser zu setzen. Der Proxy MUSS das herausfiltern.
+        if (url.searchParams.get('inject') === 'cf') {
+          headers.append('set-cookie', 'CF_Authorization=upstream-injected; Path=/; Secure; HttpOnly');
+        }
 
         return new Response(
           '<!doctype html><script>/* authorization:github:success */</script><!-- cookie:' +
@@ -49,13 +60,7 @@ export default {
             ' code:' +
             (url.searchParams.get('code') ?? '') +
             ' -->',
-          {
-            status: 200,
-            headers: {
-              'content-type': 'text/html;charset=UTF-8',
-              'set-cookie': 'csrf-token=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure',
-            },
-          },
+          { status: 200, headers },
         );
       }
 
