@@ -171,8 +171,14 @@ export function buildLoadedConfig(
     settings.allowedDomains && settings.allowedDomains.length > 0
       ? settings.allowedDomains
       : parseAllowedDomains(env.ALLOWED_DOMAINS);
-  const githubAuthUrl = firstNonBlank(settings.githubAuthUrl, env.GITHUB_AUTH_URL);
-  const manageEditorsUrl = firstNonBlank(settings.manageEditorsUrl, env.MANAGE_EDITORS_URL);
+  // Explizit deaktiviert schlaegt den Env-Fallback (sonst lebt ein geleerter
+  // Wert im migrierten Deployment wieder auf).
+  const githubAuthUrl = settings.githubAuthUrlDisabled
+    ? undefined
+    : firstNonBlank(settings.githubAuthUrl, env.GITHUB_AUTH_URL);
+  const manageEditorsUrl = settings.manageEditorsUrlDisabled
+    ? undefined
+    : firstNonBlank(settings.manageEditorsUrl, env.MANAGE_EDITORS_URL);
 
   return {
     ok: true,
