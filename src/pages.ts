@@ -795,6 +795,7 @@ document.getElementById('copycfg').addEventListener('click', function () {
     setTimeout(function () { btn.textContent = old; }, 1500);
   });
 });
+</script>
 <script>
 document.getElementById('finishwizard').addEventListener('click', function () {
   postSettings({ finishWizard: true }, function (reason) {

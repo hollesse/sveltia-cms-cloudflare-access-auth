@@ -63,6 +63,7 @@ export async function validateAccessJwt(
     const { payload } = await jwtVerify(token, getJwks(accessTeamDomain), {
       algorithms: ['RS256'],
       issuer: `https://${accessTeamDomain}`,
+      requiredClaims: ['exp'],
       ...(accessAppAud !== undefined ? { audience: accessAppAud } : {}),
     });
 
