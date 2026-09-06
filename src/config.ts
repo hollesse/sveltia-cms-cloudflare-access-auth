@@ -89,6 +89,18 @@ export function isAllowedDomain(domain: string, allowedDomains: string[]): boole
   );
 }
 
+/**
+ * Baut die exakten erlaubten Token-Handover-Origins aus den konfigurierten
+ * Domains: jede Domain -> genau `https://<domain>` (Standard-Port). Der
+ * postMessage-Empfaenger-Check vergleicht `event.origin` exakt gegen diese
+ * Liste — kein `http`, kein abweichender Port, keine automatischen Subdomains
+ * (anders als `isAllowedDomain`, das nur das schwaechere `site_id`-Eingangs-Gate
+ * bedient). Weitere (Sub-)Domains muessen ausdruecklich in `allowedDomains` stehen.
+ */
+export function buildAllowedOrigins(allowedDomains: string[]): string[] {
+  return allowedDomains.map((domain) => `https://${domain}`);
+}
+
 /** Hostname ohne Schema/Pfad (Setup-Formular-Validierung, ADR 0014). */
 const HOSTNAME_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i;
 

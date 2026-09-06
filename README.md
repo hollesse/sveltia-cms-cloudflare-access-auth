@@ -196,7 +196,9 @@ address. The wizard walks through seven steps:
    inline.
 4. **Approve a website** — comma-separated domain(s) your CMS is served
    from (`ALLOWED_DOMAINS`, e.g. `myclub.example.org`); add more with the
-   *+* button.
+   *+* button. List each **exact** CMS host: the token is only handed to
+   `https://<that host>` on the default port — subdomains are **not** matched
+   automatically, so add every host you actually use.
 5. **GitHub sign-in** (optional, skippable) — only if you also want the
    `sveltia-cms-auth` delegation path (see below).
 6. **Users link** (optional, skippable) — a deep link to your Access
