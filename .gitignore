@@ -4,6 +4,12 @@
 node_modules/
 .wrangler/
 dist/
+
+# Playwright output
+test-results/
+playwright-report/
+blob-report/
+.playwright/
 *.tsbuildinfo
 
 # Local secret/env files (never commit). Covers the README's `secrets.json`
