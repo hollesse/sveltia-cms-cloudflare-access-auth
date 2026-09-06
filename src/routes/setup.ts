@@ -27,6 +27,17 @@ function firstNonBlank(...values: (string | undefined)[]): string | undefined {
 }
 
 /**
+ * Zustandsaendernde Setup-Routen, die einen JSON-Body erwarten: sie verlangen
+ * `Content-Type: application/json` und lehnen sonst mit 415 ab — schliesst
+ * CSRF-"simple requests" (z. B. `text/plain`) aus.
+ */
+const JSON_POST_PATHS = new Set([
+  '/setup/settings',
+  '/setup/github/poll',
+  '/setup/users/delete',
+]);
+
+/**
  * Wizard-Schritt aus dem Settings-/Verbindungszustand ableiten (ADR 0014):
  * Schritte 1-3 sind Pflicht, 4-5 optional ("Überspringen" -> `*Skipped`),
  * 6 ist die Abschluss-Uebersicht.
@@ -217,6 +228,29 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
   }
 
   const url = new URL(request.url);
+
+  // CSRF-Schutz: Der Access-JWT wird von Cloudflare aus dem CF_Authorization-
+  // Cookie injiziert; je nach dessen SameSite geht es bei Cross-Site-POSTs mit.
+  // Zustandsaendernde Requests werden daher zusaetzlich an die eigene Origin
+  // gebunden. Ein Browser sendet bei Cross-Site-POST/-fetch IMMER einen
+  // Origin-Header; ein fehlender Origin stammt von Nicht-Browser-Clients
+  // (kein CSRF-Vektor) und bleibt erlaubt.
+  if (request.method === 'POST') {
+    const origin = request.headers.get('origin');
+
+    if (origin !== null && origin !== url.origin) {
+      return new Response('Forbidden', { status: 403 });
+    }
+
+    if (JSON_POST_PATHS.has(url.pathname)) {
+      const contentType = (request.headers.get('content-type') ?? '').toLowerCase();
+
+      if (!contentType.includes('application/json')) {
+        return new Response('Unsupported Media Type', { status: 415 });
+      }
+    }
+  }
+
   const config = buildLoadedConfig(anchors, settings, env);
 
   if (url.pathname === '/setup' && request.method === 'GET') {
