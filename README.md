@@ -33,10 +33,10 @@ running on free tiers end to end (Workers Free, Access Free ≤ 50 users).
   (`ALLOWED_DOMAINS`), and tokens are only posted to allowed origins. An empty
   `ALLOWED_DOMAINS` disables login entirely (no open relay).
 
-## Security model & trade-offs
+## What you should know before deploying
 
-Please read this before deploying — it determines what you can and cannot
-expect, and it has one consequence many operators overlook.
+A few things about how this works have real consequences for you as the
+operator — nothing hidden, but worth understanding up front.
 
 **Identity and authorization are split.** *Who* may sign in is decided by
 Cloudflare Access (email one-time code + your allowlist). *What* they may do
