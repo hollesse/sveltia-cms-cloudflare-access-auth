@@ -69,13 +69,14 @@ export interface UserRecord {
 export class TokenStore extends DurableObject<Env> {
   private refreshInFlight: Promise<GetTokenResult> | undefined;
 
-  /** Einmal-Setup: speichert das Paar aus dem Device Flow. */
+  /** Einmal-Setup: speichert das Paar aus dem Device Flow (neue Autorisierung). */
   async storeAuthorization(pair: TokenPair): Promise<void> {
     await this.ctx.storage.put({
       accessToken: pair.accessToken,
       expiresAt: pair.expiresAt,
       refreshToken: pair.refreshToken,
     });
+    await this.bumpGeneration();
   }
 
   /**
@@ -121,6 +122,7 @@ export class TokenStore extends DurableObject<Env> {
    */
   async clearAuthorization(): Promise<void> {
     await this.ctx.storage.delete(['accessToken', 'expiresAt', 'refreshToken']);
+    await this.bumpGeneration();
   }
 
   /** Fuer die Setup-Seite: ist der Tresor befuellt, bis wann gilt das Token? */
@@ -183,6 +185,16 @@ export class TokenStore extends DurableObject<Env> {
     return next;
   }
 
+  /**
+   * Erhoeht die Autorisierungs-Generation (bei neuer Autorisierung bzw.
+   * Disconnect). Ein zeitgleich laufender Refresh erkennt an einer veraenderten
+   * Generation, dass sein Ergebnis veraltet ist, und verwirft es.
+   */
+  private async bumpGeneration(): Promise<void> {
+    const generation = (await this.ctx.storage.get<number>('generation')) ?? 0;
+    await this.ctx.storage.put('generation', generation + 1);
+  }
+
   private refresh(clientId: string): Promise<GetTokenResult> {
     this.refreshInFlight ??= this.doRefresh(clientId).finally(() => {
       this.refreshInFlight = undefined;
@@ -192,7 +204,10 @@ export class TokenStore extends DurableObject<Env> {
   }
 
   private async doRefresh(clientId: string): Promise<GetTokenResult> {
-    const refreshToken = await this.ctx.storage.get<string>('refreshToken');
+    const [refreshToken, generation] = await Promise.all([
+      this.ctx.storage.get<string>('refreshToken'),
+      this.ctx.storage.get<number>('generation'),
+    ]);
 
     if (refreshToken === undefined) {
       return { ok: false, reason: 'not_authorized' };
@@ -208,7 +223,22 @@ export class TokenStore extends DurableObject<Env> {
       return { ok: false, reason: 'refresh_failed' };
     }
 
-    await this.storeAuthorization(result.pair);
+    // Waehrend des GitHub-Fetch (Input-Gate offen) koennte ein Disconnect oder
+    // eine neue Autorisierung gelaufen sein — dann ist dieses Ergebnis veraltet
+    // und darf NICHT gespeichert werden (sonst wird der getrennte Zustand
+    // wiederhergestellt bzw. ein neues Konto ueberschrieben). Neu-Pruefung und
+    // Write laufen ohne fetch dazwischen, also atomar (DO-Input-Gate).
+    const currentGeneration = (await this.ctx.storage.get<number>('generation')) ?? 0;
+
+    if ((generation ?? 0) !== currentGeneration) {
+      return { ok: false, reason: 'refresh_failed' };
+    }
+
+    await this.ctx.storage.put({
+      accessToken: result.pair.accessToken,
+      expiresAt: result.pair.expiresAt,
+      refreshToken: result.pair.refreshToken,
+    });
 
     return { ok: true, token: result.pair.accessToken };
   }
