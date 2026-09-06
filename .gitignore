@@ -5,4 +5,12 @@ node_modules/
 .wrangler/
 dist/
 *.tsbuildinfo
+
+# Local secret/env files (never commit). Covers the README's `secrets.json`
+# and both dotted and undotted variants, plus Wrangler/dotenv local files.
 .secrets.json
+secrets.json
+.dev.vars
+.dev.vars.*
+.env
+.env.*
