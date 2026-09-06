@@ -1,0 +1,8 @@
+.idea/
+.agentheim/
+.worktrees/
+node_modules/
+.wrangler/
+dist/
+*.tsbuildinfo
+.secrets.json

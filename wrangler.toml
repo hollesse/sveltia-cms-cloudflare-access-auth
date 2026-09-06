@@ -1,0 +1,49 @@
+name = "sveltia-cms-cloudflare-access-auth"
+main = "src/index.ts"
+compatibility_date = "2026-08-22"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+
+# Sicherheitsnetz fuer Betreiber, die Werte doch als Dashboard-Text-Vars
+# anlegen: keep_vars MUSS top-level stehen (unterhalb einer [[...]]-Tabelle
+# wuerde TOML es der Tabelle zuordnen — so gingen hier einmal Vars verloren).
+# Empfohlen ist ohnehin die Secrets-Variante (siehe unten), die von Deploys
+# grundsaetzlich unberuehrt bleibt.
+keep_vars = true
+
+# Betreiber-Konfiguration lebt NICHT in dieser Datei (ADR 0009, Amendment):
+# Diese Datei ist reiner Code — fuer ein Deployment muss nichts im Repo
+# angepasst werden.
+#
+# Seit ADR 0014 genuegen genau ZWEI Secrets zum Bootstrappen — der Rest
+# (Client-ID, AUD, erlaubte Domains, optionale URLs) wird per Setup-Wizard
+# unter /setup im Browser eingerichtet und lebt als Setting im TokenStore-
+# Durable-Object (kein Redeploy, kein `wrangler secret put` fuer Aenderungen):
+#
+#   ACCESS_TEAM_DOMAIN           z. B. "meinteam.cloudflareaccess.com"
+#                                (Vertrauensanker: validiert Issuer/JWKS)
+#   SETUP_ADMINS                 kommagetrennte Admin-E-Mails fuer /setup
+#                                (ADR 0012; leer/fehlend = Setup gesperrt;
+#                                Bootstrap-Identitaet, Rettungsweg fuer diesen
+#                                Wert bleibt `wrangler secret put`)
+#
+# Optionaler Env-Fallback (Migrationspfad aus Vor-0014-Deployments, ADR 0014):
+# ist ein Wert im DO nicht gesetzt, gilt der gleichnamige Env-Wert; DO-Wert
+# hat Vorrang. Neue Deployments muessen diese Variablen NICHT mehr setzen:
+#
+#   GITHUB_APP_CLIENT_ID, ACCESS_APP_AUD, ALLOWED_DOMAINS, GITHUB_AUTH_URL,
+#   MANAGE_EDITORS_URL — je per `wrangler secret put`, wenn gebraucht.
+
+# Token-Rotation (ADR 0011): Der Cron ist der einzige regulaere Refresher
+# des Bot-Tokens (Single-Writer, 0/6/12/18 Uhr UTC; Access-Token leben 8 h,
+# 2 h Puffer). Das Token-Paar lebt im TokenStore-Durable-Object — dessen
+# Binding ist rein generisch (kein account-spezifischer Wert, ADR 0011).
+[triggers]
+crons = ["0 0,6,12,18 * * *"]
+
+[[durable_objects.bindings]]
+name = "TOKEN_STORE"
+class_name = "TokenStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TokenStore"]

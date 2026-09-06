@@ -1,0 +1,32 @@
+# CI prueft, deployt aber nicht (ADR 0007): kein Deploy-Job, kein
+# CLOUDFLARE_API_TOKEN — Forks laufen ohne Secrets gruen. Deploy ist
+# Betreiber-Sache (`wrangler deploy` lokal).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests (Workers runtime, mocked upstreams)
+        run: npm test
+
+      - name: Deploy dry-run (bundle check, no upload)
+        run: npx wrangler deploy --dry-run
