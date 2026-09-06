@@ -4,11 +4,10 @@ import type { TokenStore } from '../src/token-store.js';
 import type { Env } from '../src/types.js';
 
 /**
- * Lifecycle-Race (Audit-Analogon zu ChatGPT A06, hier auf das SICHERE Soll
- * gedreht): Ein laufender Refresh haelt sein Ergebnis zurueck, waehrend ein
- * Disconnect bzw. eine neue Autorisierung dazwischenkommt. Der veraltete
- * Refresh darf danach weder den getrennten Zustand wiederherstellen noch das
- * frisch verbundene Konto ueberschreiben.
+ * Lifecycle-Race: Ein laufender Refresh haelt sein Ergebnis zurueck, waehrend ein
+ * Disconnect bzw. eine neue Autorisierung dazwischenkommt. Der veraltete Refresh
+ * darf danach weder den getrennten Zustand wiederherstellen noch das frisch
+ * verbundene Konto ueberschreiben.
  */
 const testEnv = env as unknown as Env;
 
