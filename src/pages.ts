@@ -1,3 +1,4 @@
+import { buildAllowedOrigins } from './config.js';
 import type { LoadedConfig, MissingRequiredConfig } from './config.js';
 import type { Texts } from './texts.js';
 import type { TokenStoreStatus, UserRecord } from './token-store.js';
@@ -417,9 +418,9 @@ interface CallbackSuccessPayload {
  * 401 -> Logout -> Re-Login statt zu einem kaputten Silent-Refresh-Pfad.
  *
  * Handshake (Decap/Sveltia-Protokoll): Popup sendet `authorizing:github` an
- * den Opener, wartet auf dessen Antwort, prueft `event.origin` der Antwort
- * gegen `allowedDomains` und sendet erst dann den Token an genau diesen
- * Origin.
+ * den Opener, wartet auf dessen Antwort, prueft `event.source === window.opener`
+ * und `event.origin` EXAKT gegen die erlaubten Origins (nur HTTPS, exakter Host,
+ * Standard-Port) und sendet erst dann den Token an genau diesen Origin.
  */
 export function renderCallbackSuccessPage(
   payload: CallbackSuccessPayload,
@@ -429,23 +430,15 @@ export function renderCallbackSuccessPage(
   const script = `(function () {
   var provider = ${JSON.stringify(payload.provider)};
   var payload = ${JSON.stringify(payload)};
-  var allowedDomains = ${JSON.stringify(allowedDomains)};
+  var allowedOrigins = ${JSON.stringify(buildAllowedOrigins(allowedDomains))};
 
-  function isTrusted(origin) {
-    if (!allowedDomains.length) { return false; }
-    try {
-      var host = new URL(origin).hostname.toLowerCase();
-      return allowedDomains.some(function (domain) {
-        return host === domain || host.endsWith('.' + domain);
-      });
-    } catch (e) {
-      return false;
-    }
-  }
+  if (!window.opener) { return; }
 
   function receiveMessage(event) {
+    if (event.source !== window.opener) { return; }
     if (event.data !== ('authorizing:' + provider)) { return; }
-    if (!isTrusted(event.origin)) { return; }
+    if (allowedOrigins.indexOf(event.origin) === -1) { return; }
+    window.removeEventListener('message', receiveMessage, false);
     window.opener.postMessage(
       'authorization:' + provider + ':success:' + JSON.stringify(payload),
       event.origin,
@@ -476,23 +469,15 @@ export function renderCallbackErrorPage(
   const script = `(function () {
   var provider = 'github';
   var errorPayload = { provider: provider, error: ${JSON.stringify(message)} };
-  var allowedDomains = ${JSON.stringify(allowedDomains)};
+  var allowedOrigins = ${JSON.stringify(buildAllowedOrigins(allowedDomains))};
 
-  function isTrusted(origin) {
-    if (!allowedDomains.length) { return false; }
-    try {
-      var host = new URL(origin).hostname.toLowerCase();
-      return allowedDomains.some(function (domain) {
-        return host === domain || host.endsWith('.' + domain);
-      });
-    } catch (e) {
-      return false;
-    }
-  }
+  if (!window.opener) { return; }
 
   function receiveMessage(event) {
+    if (event.source !== window.opener) { return; }
     if (event.data !== ('authorizing:' + provider)) { return; }
-    if (!isTrusted(event.origin)) { return; }
+    if (allowedOrigins.indexOf(event.origin) === -1) { return; }
+    window.removeEventListener('message', receiveMessage, false);
     window.opener.postMessage(
       'authorization:' + provider + ':error:' + JSON.stringify(errorPayload),
       event.origin,
