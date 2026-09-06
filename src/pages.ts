@@ -210,13 +210,29 @@ ${footerHtml(lang)}
 </body>
 </html>`;
 
+/**
+ * Security-Header fuer alle vom Worker gerenderten Seiten: nicht cachebar (die
+ * Seiten tragen teils Tokens/E-Mails), nicht einbettbar (Clickjacking-Schutz
+ * per CSP + X-Frame-Options), kein MIME-Sniffing, kein Referrer-Leak.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  'cache-control': 'no-store',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'x-frame-options': 'DENY',
+  'content-security-policy': "frame-ancestors 'none'",
+};
+
 const adminHtmlResponse = (body: string, status = 200): Response =>
-  new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
+  new Response(body, {
+    status,
+    headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS },
+  });
 
 const htmlResponse = (body: string, status = 200): Response =>
   new Response(body, {
     status,
-    headers: { 'content-type': 'text/html; charset=utf-8' },
+    headers: { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS },
   });
 
 const REPO_URL = 'https://github.com/hollesse/sveltia-cms-cloudflare-access-auth';

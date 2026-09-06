@@ -342,7 +342,11 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     // Token unmittelbar — gleiche Wirkung wie ein Cron-Tick.
     const rotated = await tokenStore.rotate(clientId);
 
-    return Response.json(rotated, { status: rotated.ok ? 200 : 502 });
+    // Traegt das frische Access-Token -> nicht cachebar.
+    return Response.json(rotated, {
+      status: rotated.ok ? 200 : 502,
+      headers: { 'cache-control': 'no-store' },
+    });
   }
 
   if (url.pathname === '/setup/github/poll' && request.method === 'POST') {
