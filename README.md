@@ -33,6 +33,65 @@ running on free tiers end to end (Workers Free, Access Free ≤ 50 users).
   (`ALLOWED_DOMAINS`), and tokens are only posted to allowed origins. An empty
   `ALLOWED_DOMAINS` disables login entirely (no open relay).
 
+## Security model & trade-offs
+
+Please read this before deploying — it determines what you can and cannot
+expect, and it has one consequence many operators overlook.
+
+**Identity and authorization are split.** *Who* may sign in is decided by
+Cloudflare Access (email one-time code + your allowlist). *What* they may do
+in the repository comes from a single shared **bot GitHub account** that
+authorizes the GitHub App once. Everyone who signs in through the email path
+receives a token that acts as that one bot.
+
+What that means for you as the operator:
+
+- **No per-person attribution on the email path.** Every commit made through
+  the email login is authored by the bot account. You **cannot tell from the
+  git history which editor wrote a given change** — the history shows the bot,
+  not the person. If you need real per-author commits, have those editors use
+  the optional *personal GitHub* sign-in path instead (see below), where each
+  commit carries their own GitHub identity.
+- **Everyone gets the same permissions.** The email path grants exactly the
+  bot's repository permissions (Contents: read/write on the target repo).
+  There are no roles and no per-user restrictions — anyone on the allowlist can
+  edit anything the bot can. (Fine-grained roles are an explicit non-goal of v1.)
+- **You can see *who signed in*, not *who wrote what*.** The dashboard's
+  sign-in history is an audit log of authentications (who, first/last time); it
+  does not link commits to people.
+
+**Token lifetimes and where tokens live:**
+
+- The token handed to an editor's browser **expires after 8 hours**. Like every
+  git-based CMS, Sveltia keeps it in the browser's `localStorage` unencrypted —
+  but its short life means a leaked or copied token is worthless within hours,
+  and needs no manual revocation.
+- The service refreshes the bot token automatically four times a day
+  (00/06/12/18 UTC) and renews the underlying refresh token on every rotation,
+  so nothing ever reaches GitHub's 6-month refresh-token expiry — even if the
+  site is untouched for months.
+- The **refresh token is the only long-lived secret**. It lives in the worker's
+  Durable Object and is never sent to any browser. The worker holds **no GitHub
+  secrets in its configuration** — the bot authorizes once via device flow.
+
+**Removing access (offboarding):** delete the person from the Access policy.
+They lose access after at most *(Access session length, default 1 week) + 8
+hours*. To cut everyone off immediately — e.g. on a suspected leak — click
+*Rotate token now* in the dashboard; every outstanding token stops working at
+once. Shortening the Access session length reduces the offboarding delay.
+
+**Abuse protection:** requests must carry an allowed `site_id`
+(`ALLOWED_DOMAINS`) and tokens are only delivered to allowed origins; an empty
+list disables login entirely (no open relay). The admin area is restricted to
+the `SETUP_ADMINS` emails.
+
+**The personal-GitHub alternative.** If you enable the optional GitHub sign-in
+path (delegated to `sveltia-cms-auth`, see below), editors using it sign in with
+their own GitHub account: commits are attributed to them personally, but that
+path uses GitHub's classic long-lived token (no 8-hour expiry). It is the
+opposite trade-off — real attribution, longer-lived browser token. You can
+offer both paths at once; each editor picks per login.
+
 ## Prerequisites
 
 - A Cloudflare account (free plan is fine).
