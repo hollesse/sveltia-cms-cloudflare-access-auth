@@ -1,5 +1,5 @@
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import { jwks } from './test/fixtures/access-identity.js';
 
 /**
@@ -145,5 +145,7 @@ export default defineConfig({
   ],
   test: {
     setupFiles: ['./test/setup.ts'],
+    // Playwright-Browser-Tests laufen separat (siehe playwright.config.ts).
+    exclude: [...configDefaults.exclude, 'test/e2e/**'],
   },
 });

@@ -17,5 +17,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src", "test"],
-  "exclude": ["vitest.config.mts"]
+  "exclude": ["vitest.config.mts", "test/e2e"]
 }
