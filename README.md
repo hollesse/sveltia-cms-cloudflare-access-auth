@@ -184,27 +184,42 @@ round-trip so the CMS's origin checks stay happy):
 3. Make sure the `sveltia-cms-auth` deployment's own `ALLOWED_DOMAINS`
    includes your site's domain.
 
-## Operations
+## Running the service day to day
 
-- **Add/remove users:** edit the Access policy (Include → Emails) — reachable
-  via the dashboard's *Manage users* button. Removal takes effect within
-  Access session + 8 h. No other list to maintain for the email path.
-- **Sign-in history:** the dashboard's Users section records who signed in and
-  when (first/last), as an audit log — Access remains the source of truth for
-  *who may* sign in. This stores editors' email addresses + timestamps
-  (personal data); a **Clear history** button and per-user delete are provided
-  (ADR 0015). As the operator you are responsible for its GDPR handling.
-- **Admins:** `SETUP_ADMINS` (comma-separated emails) controls who can open
-  `/setup` (wizard + dashboard). Editors get a 403 there.
-- **Rotation:** automatic at 00/06/12/18 UTC. Each rotation also renews the
-  refresh token, so nothing ever ages out — even if the site sleeps for
-  months. If a rotation moment cuts a live editing session, the editor
-  reloads, re-signs in (2 seconds with a live Access session) and restores
-  the draft — see [docs/redakteure.md](docs/redakteure.md).
-- **Suspected leak:** press "Rotate token now" on the setup page — all
-  outstanding tokens die immediately.
-- **Recovery:** if GitHub ever revokes the bot's authorization, logins show a
-  clear error page; reconnect via the dashboard's GitHub-connection section.
+Once set up, the service runs itself — token rotation is automatic and there is
+no scheduled maintenance. The only recurring task is deciding who may sign in.
+Everything below is done from the admin dashboard at `/setup`.
+
+**Add or remove a user.** Access is controlled entirely by your Cloudflare
+Access policy, not by this service. Click *Manage users* in the dashboard to
+open that policy and add or remove an email address. A removed user loses
+access once their Access session and last token expire (at most session length
++ 8 hours). The dashboard's user list is only a **sign-in history** (who signed
+in, first and last time) — deleting someone there does *not* revoke access, and
+adding happens only in the Access policy.
+
+**Who can open the admin area.** Only the emails in the `SETUP_ADMINS` secret
+can open `/setup`; everyone else gets "access denied". Change it with
+`wrangler secret put SETUP_ADMINS` (comma-separated).
+
+**Tokens (normally nothing to do).** The service hands each editor a token that
+expires after 8 hours and refreshes itself automatically four times a day
+(00/06/12/18 UTC), so it never goes stale — even if the site is untouched for
+months. If a refresh happens while someone is mid-edit, they simply see a
+save error, reload, sign in again (a two-second popup), and their draft is
+still there — see [docs/redakteure.md](docs/redakteure.md).
+
+**If you suspect a token leaked.** Click *Rotate token now* in the dashboard —
+every token currently out there stops working immediately.
+
+**If sign-in suddenly fails for everyone.** GitHub may have revoked the bot's
+authorization (e.g. the bot account changed its password). The login shows a
+clear error; fix it by clicking *Reconnect* in the dashboard's GitHub section
+and re-authorizing as the bot.
+
+**Privacy note.** The sign-in history stores editors' email addresses and
+timestamps (personal data). Use *Clear history* or per-user delete to remove
+it; as the operator you are responsible for handling it under GDPR.
 
 ## Troubleshooting
 
