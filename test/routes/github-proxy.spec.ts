@@ -98,4 +98,50 @@ describe('GitHub-Delegations-Proxy (Option C, §7.6)', () => {
       ).status,
     ).toBe(404);
   });
+
+  // Der Proxy teilt sich den Origin mit /setup. Nur der sveltia-cms-auth-CSRF-
+  // Cookie (`csrf-token`) darf den Proxy in beide Richtungen passieren; die
+  // Access-Identitaet (`CF_Authorization`) und fremde Cookies duerfen weder zum
+  // Upstream gelangen noch aus ihm zum Browser.
+  it('does not forward CF_Authorization or other non-CSRF cookies to the upstream', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/callback?code=abc&state=teststate',
+      {
+        headers: {
+          cookie:
+            'csrf-token=github_00000000000000000000000000000000; CF_Authorization=SECRET_ACCESS_JWT; other=x',
+        },
+        redirect: 'manual',
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+
+    // Der OAuth-CSRF-Cookie muss den Upstream erreichen (Flow-Voraussetzung).
+    expect(body).toContain('cookie:csrf-token=github_00000000000000000000000000000000');
+    // Access-Identitaet und fremde Cookies duerfen den Upstream NICHT erreichen.
+    expect(body).not.toContain('CF_Authorization');
+    expect(body).not.toContain('SECRET_ACCESS_JWT');
+    expect(body).not.toContain('other=x');
+  });
+
+  it('does not relay an upstream-set CF_Authorization cookie back to the browser', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/callback?code=abc&state=teststate&inject=cf',
+      {
+        headers: { cookie: 'csrf-token=github_00000000000000000000000000000000' },
+        redirect: 'manual',
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const setCookies = response.headers.getSetCookie();
+    const joined = setCookies.join('\n');
+
+    // Der legitime CSRF-Cookie wird weiterhin durchgereicht.
+    expect(joined).toContain('csrf-token=deleted');
+    // Ein vom Upstream gesetztes Access-Cookie wird herausgefiltert.
+    expect(joined).not.toContain('CF_Authorization');
+  });
 });

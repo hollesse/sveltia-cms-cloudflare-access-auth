@@ -26,6 +26,37 @@ const PATH_MAP: Record<string, string> = {
   '/callback': '/callback',
 };
 
+/**
+ * Cookie-Allowlist des Proxys: NUR der CSRF-state-Cookie von `sveltia-cms-auth`
+ * — `csrf-token` (gegen den Upstream-Quellcode verifiziert) — darf den Proxy
+ * passieren, in BEIDE Richtungen. Der Proxy teilt sich den Origin mit `/setup`;
+ * ohne diese Grenze ginge die Cloudflare-Access-Identitaet (`CF_Authorization`)
+ * an den Upstream, und ein (kompromittierter) Upstream koennte im Admin-Origin
+ * ein Access-/Fremd-Cookie setzen oder ueberschreiben.
+ */
+const PROXIED_COOKIE_NAMES = ['csrf-token'];
+
+/** Cookie-Name aus einem `name=value`-Paar (Vergleich case-insensitiv). */
+function cookieName(pair: string): string {
+  const eq = pair.indexOf('=');
+  return (eq === -1 ? pair : pair.slice(0, eq)).trim().toLowerCase();
+}
+
+/** Filtert einen `Cookie`-Request-Header auf die erlaubten Namen. */
+function filterRequestCookies(header: string): string {
+  return header
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair !== '' && PROXIED_COOKIE_NAMES.includes(cookieName(pair)))
+    .join('; ');
+}
+
+/** Prueft, ob ein `Set-Cookie`-Header einen erlaubten Cookie setzt. */
+function isProxiedSetCookie(setCookie: string): boolean {
+  const firstPair = setCookie.split(';', 1)[0] ?? '';
+  return PROXIED_COOKIE_NAMES.includes(cookieName(firstPair));
+}
+
 export async function handleGithubProxy(
   request: Request,
   config: LoadedConfig,
@@ -51,11 +82,23 @@ export async function handleGithubProxy(
 
   const upstreamHeaders = new Headers();
 
-  for (const name of ['cookie', 'accept', 'accept-language', 'user-agent']) {
+  for (const name of ['accept', 'accept-language', 'user-agent']) {
     const value = request.headers.get(name);
 
     if (value !== null) {
       upstreamHeaders.set(name, value);
+    }
+  }
+
+  // Cookie NICHT roh durchreichen: nur den erlaubten CSRF-Cookie, damit
+  // `CF_Authorization` & Co. den Upstream nie erreichen.
+  const rawCookie = request.headers.get('cookie');
+
+  if (rawCookie !== null) {
+    const filtered = filterRequestCookies(rawCookie);
+
+    if (filtered !== '') {
+      upstreamHeaders.set('cookie', filtered);
     }
   }
 
@@ -84,8 +127,12 @@ export async function handleGithubProxy(
     }
   }
 
+  // Nur erlaubte Set-Cookies an den Browser weitergeben: ein Upstream darf im
+  // geteilten Admin-Origin kein Access-/Fremd-Cookie setzen.
   for (const cookie of upstream.headers.getSetCookie()) {
-    responseHeaders.append('set-cookie', cookie);
+    if (isProxiedSetCookie(cookie)) {
+      responseHeaders.append('set-cookie', cookie);
+    }
   }
 
   return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });

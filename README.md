@@ -243,6 +243,16 @@ round-trip so the CMS's origin checks stay happy):
 3. Make sure the `sveltia-cms-auth` deployment's own `ALLOWED_DOMAINS`
    includes your site's domain.
 
+**Security note (delegated trust).** This worker proxies the OAuth round-trip on
+its own origin — the same origin as `/setup`. The `sveltia-cms-auth` deployment you
+point to therefore runs inside your admin origin's trust boundary. The worker only
+ever forwards the `csrf-token` cookie in either direction, so your Cloudflare Access
+identity (`CF_Authorization`) is never exposed to it and it cannot set cookies in
+your origin — but a compromised or XSS-affected upstream could still act within the
+admin origin. Treat that deployment as trusted as this worker itself: run your own
+instance and keep it updated. If you need stronger isolation, host the admin area on
+a separate origin.
+
 ## Running the service day to day
 
 Once set up, the service runs itself — token rotation is automatic and there is
