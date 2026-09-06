@@ -145,20 +145,24 @@ async function handleUpdateSettings(
   if (body.githubAuthUrl !== undefined) {
     if (body.githubAuthUrl === '') {
       partial.githubAuthUrl = undefined;
+      partial.githubAuthUrlDisabled = true; // explizit aus -> Env-Fallback unterdruecken
     } else if (!isValidHttpsUrl(body.githubAuthUrl)) {
       return Response.json({ ok: false, reason: 'invalid_url' }, { status: 400 });
     } else {
       partial.githubAuthUrl = body.githubAuthUrl;
+      partial.githubAuthUrlDisabled = false;
     }
   }
 
   if (body.manageEditorsUrl !== undefined) {
     if (body.manageEditorsUrl === '') {
       partial.manageEditorsUrl = undefined;
+      partial.manageEditorsUrlDisabled = true;
     } else if (!isValidHttpsUrl(body.manageEditorsUrl)) {
       return Response.json({ ok: false, reason: 'invalid_url' }, { status: 400 });
     } else {
       partial.manageEditorsUrl = body.manageEditorsUrl;
+      partial.manageEditorsUrlDisabled = false;
     }
   }
 

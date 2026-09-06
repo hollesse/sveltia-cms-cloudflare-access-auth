@@ -38,6 +38,13 @@ export interface StoredSettings {
   /** Vom Fertig-Schritt des Wizards gesetzt (ADR 0014): Wizard durchlaufen. */
   wizardDone?: boolean;
   manageEditorsUrlSkipped?: boolean;
+  /**
+   * Explizit deaktiviert: der Betreiber hat die URL im Dashboard geleert. Anders
+   * als "nicht gesetzt" unterdrueckt dies den gleichnamigen Env-Fallback, sodass
+   * ein migriertes Deployment die Funktion wirklich abschalten kann.
+   */
+  githubAuthUrlDisabled?: boolean;
+  manageEditorsUrlDisabled?: boolean;
 }
 
 const SETTINGS_KEY = 'settings:v1';
