@@ -1,4 +1,4 @@
-import { loadConfig } from './config.js';
+import { isAllowedDomain, loadConfig } from './config.js';
 import { handleAuthAccess } from './routes/access.js';
 import { handleAuth } from './routes/auth.js';
 import { handleGithubProxy } from './routes/github-proxy.js';
@@ -43,6 +43,18 @@ export default {
         // vor der Settings-im-DO-Umstellung (no_allowed_domains -> 404).
         if (!config.ok || config.allowedDomains.length === 0) {
           return new Response('Not Found', { status: 404 });
+        }
+
+        // Eingangs-Gate am Einstieg: `site_id` muss eine erlaubte Domain sein,
+        // bevor irgendetwas nach aussen geht (wie `/auth`). Nur am `/auth/github`-
+        // Einstieg — der `/callback` traegt keinen vertrauenswuerdigen `site_id`
+        // (GitHub kontrolliert den Redirect) und bleibt am Upstream-Origin-Check.
+        if (pathname === '/auth/github') {
+          const siteId = new URL(request.url).searchParams.get('site_id') ?? '';
+
+          if (!isAllowedDomain(siteId, config.allowedDomains)) {
+            return new Response('Not Found', { status: 404 });
+          }
         }
 
         return handleGithubProxy(request, config);
