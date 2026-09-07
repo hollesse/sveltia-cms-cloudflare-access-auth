@@ -148,8 +148,6 @@ export interface Texts {
     loginToggleLabel: string;
     loginActiveBadge: string;
     loginDisabledBadge: string;
-    loginEnableButton: string;
-    loginDisableButton: string;
     loginToggleHint: string;
     loginDisableConfirm: string;
     collapseLabel: string;
@@ -386,8 +384,6 @@ const de: Texts = {
     loginToggleLabel: 'Redakteur-Login',
     loginActiveBadge: 'Aktiv',
     loginDisabledBadge: 'Deaktiviert',
-    loginEnableButton: 'Login aktivieren',
-    loginDisableButton: 'Login deaktivieren',
     loginToggleHint: 'Steuert die Anmeldung der Redakteure. Deaktivieren wirkt sofort — auch für bereits offene Sessions bekommt niemand mehr ein Token (für Wartungsfenster oder als Notbremse). Der interne Token-Refresh läuft weiter; Aktivieren stellt den Normalbetrieb sofort wieder her.',
     loginDisableConfirm: 'Redakteur-Login wirklich deaktivieren? Danach kann sich niemand mehr anmelden, bis du ihn wieder aktivierst.',
     collapseLabel: 'Einklappen',
@@ -621,8 +617,6 @@ const en: Texts = {
     loginToggleLabel: 'Editor sign-in',
     loginActiveBadge: 'Enabled',
     loginDisabledBadge: 'Disabled',
-    loginEnableButton: 'Enable sign-in',
-    loginDisableButton: 'Disable sign-in',
     loginToggleHint: 'Controls whether editors can sign in. Disabling takes effect immediately — even live sessions stop receiving tokens (for maintenance windows or as an emergency brake). The internal token refresh keeps running; enabling restores normal operation right away.',
     loginDisableConfirm: 'Really disable editor sign-in? Nobody will be able to sign in until you enable it again.',
     collapseLabel: 'Collapse',

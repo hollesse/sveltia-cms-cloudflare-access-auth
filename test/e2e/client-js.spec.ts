@@ -68,4 +68,27 @@ test.describe('interactive client behaviour', () => {
     await page.locator('.brand').click();
     await expect(menu).toBeHidden();
   });
+
+  test('login toggle is on by default and confirms before disabling', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+
+    // The toggle lives in the Settings section — activate it first.
+    await page.locator('.navbtn[data-section="settings"]').click();
+
+    const toggle = page.locator('#loginToggle');
+    await expect(toggle).toBeChecked();
+
+    let dialogShown = false;
+    page.on('dialog', (dialog) => {
+      dialogShown = true;
+      void dialog.dismiss();
+    });
+    // The checkbox itself is opacity:0; a real user clicks the visible switch label.
+    await page.locator('label.toggle-switch').click();
+
+    // Dismissing the confirm reverts the switch and performs no navigation.
+    expect(dialogShown).toBe(true);
+    await expect(toggle).toBeChecked();
+  });
 });
