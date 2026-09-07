@@ -45,6 +45,18 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
     return renderAccessUnauthorizedPage(t);
   }
 
+  // Notfall-Kill-Switch: ist die Token-Ausgabe gesperrt, wird selbst mit
+  // gueltigem Access-JWT kein Token herausgegeben (kein Tokenwert im Body) —
+  // sofort wirksam, ohne auf Session- oder Token-Ablauf zu warten.
+  if (config.tokenIssuanceDisabled) {
+    return renderCallbackErrorPage(
+      t.callbackError.issuanceDisabled,
+      config.allowedDomains,
+      t,
+      503,
+    );
+  }
+
   const url = new URL(request.url);
   const siteId = url.searchParams.get('site_id') ?? '';
 
