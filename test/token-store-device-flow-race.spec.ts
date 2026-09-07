@@ -22,7 +22,11 @@ const pair = (accessToken: string) => ({
   refreshToken: `refresh-${accessToken}`,
   expiresAt: Date.now() + 8 * 3600 * 1000,
 });
-const account = (login: string) => ({ login, installations: 1 });
+// accountId ist fuer diese Race-Tests irrelevant (die Pending-Flow-Pruefung
+// weist beide Faelle bereits VOR der Konto-Pin-Pruefung ab, siehe
+// `completePendingFlow`) — fester Platzhalterwert genuegt (AccountInfo,
+// Reaudit R5, auth-p6d2c).
+const account = (login: string) => ({ login, accountId: 1, installations: 1 });
 
 const flow = (overrides: Partial<{ txId: string; deviceCode: string }> = {}) => ({
   txId: 'tx-a',

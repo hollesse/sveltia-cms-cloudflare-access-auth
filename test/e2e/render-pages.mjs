@@ -48,7 +48,15 @@ export async function renderAllPages() {
     authorized: true,
     expiresAt: now + 3_600_000,
     accessToken: 'ghu_bot_token',
-    account: { login: 'myclub-cms-bot', installations: 1 },
+    account: { login: 'myclub-cms-bot', accountId: 4242, installations: 1 },
+  };
+  // Altbestand OHNE gespeicherte `accountId` (vor dem Konto-Pin verbunden,
+  // Reaudit R5, auth-p6d2c) — deckt den Verifier-Fund aus Iteration 1 ab:
+  // die Dashboard-Anzeige muss dies als "unbekannt" zeigen, nicht als
+  // "undefined". `account` ist absichtlich untypisiert (kein `accountId`).
+  const statusLegacyAccount = {
+    ...status,
+    account: { login: 'legacy-cms-bot', installations: 3 },
   };
   const users = [{ email: 'redakteurin@example.com', firstSeen: now - 100_000, lastSeen: now }];
   const events = [
@@ -68,6 +76,7 @@ export async function renderAllPages() {
       add(`wizard-step-${step}`, p.renderWizardPage(step, config, 'admin@example.com', 'aud-value', 'https://worker.example.com', t));
     }
     add('dashboard', p.renderDashboardPage(config, status, users, events, 'admin@example.com', 'aud-value', t));
+    add('dashboard-legacy-account', p.renderDashboardPage(config, statusLegacyAccount, users, events, 'admin@example.com', 'aud-value', t));
     add('callback-success', p.renderCallbackSuccessPage({ provider: 'github', token: 'ghu_bot_token' }, ['cms.example.com'], t));
     add('callback-error', p.renderCallbackErrorPage('Beispiel-Fehler', ['cms.example.com'], t));
     add('selection', p.renderSelectionPage('https://worker.example.com/auth/github?site_id=cms.example.com', 'https://worker.example.com/auth/access?site_id=cms.example.com', 'cms.example.com', t));

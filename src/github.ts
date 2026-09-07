@@ -167,8 +167,12 @@ export interface AuthorizationInfo {
   /** GitHub-Login des autorisierten Kontos (der Bot). */
   login: string;
   accountId: number;
-  /** Anzahl der App-Installationen, die dieses Token erreicht. */
-  installations: number;
+  /**
+   * Anzahl der App-Installationen, die dieses Token erreicht, oder `null`,
+   * wenn die Abfrage fehlgeschlagen ist (Reaudit R5, auth-p6d2c) — das ist
+   * NICHT dasselbe wie "wirklich 0 Installationen".
+   */
+  installations: number | null;
 }
 
 function apiHeaders(accessToken: string): Record<string, string> {
@@ -186,7 +190,10 @@ function apiHeaders(accessToken: string): Record<string, string> {
  * (`GET /user/installations`) Die Identitaet ist das Gate: ein
  * ungueltiges Token / fehlgeschlagenes `GET /user` liefert `ok: false`, sodass
  * der Aufrufer NICHT speichert (statt still eine kaputte/falsche Verbindung
- * abzulegen). Die Installations-Zahl ist best effort (informativ).
+ * abzulegen). Die Installations-Zahl ist best effort (informativ): schlaegt
+ * NUR diese Abfrage fehl, ist das Ergebnis trotzdem `ok: true`, aber
+ * `installations` wird `null` ("unbekannt") statt einer falschen 0
+ * (Reaudit R5, auth-p6d2c).
  */
 export async function verifyAuthorization(
   accessToken: string,
@@ -209,17 +216,19 @@ export async function verifyAuthorization(
     return { ok: false, reason: 'github_malformed_response' };
   }
 
-  let installations = 0;
+  // `null` = Abfrage fehlgeschlagen ("unbekannt", Reaudit R5, auth-p6d2c) —
+  // bewusst UNTERSCHIEDEN von "0 erreichbare Installationen".
+  let installations: number | null = null;
 
   try {
     const response = await fetch(GITHUB_API_INSTALLATIONS_URL, { headers: apiHeaders(accessToken) });
 
     if (response.ok) {
       const data = (await response.json()) as { total_count?: number };
-      installations = typeof data.total_count === 'number' ? data.total_count : 0;
+      installations = typeof data.total_count === 'number' ? data.total_count : null;
     }
   } catch {
-    installations = 0;
+    installations = null;
   }
 
   return { ok: true, login: user.login, accountId: user.id, installations };

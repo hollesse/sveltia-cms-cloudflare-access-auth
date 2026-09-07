@@ -484,17 +484,32 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
       // ERNEUT gegen den dann aktuellen Stand und schreibt nur, wenn er noch
       // passt — ein zwischenzeitlicher Disconnect oder ein neuer Flow lassen
       // diesen (dann veralteten) Abschluss abgewiesen werden, ohne etwas zu
-      // speichern oder den fremden Pending-Flow zu loeschen.
+      // speichern oder den fremden Pending-Flow zu loeschen. Zusaetzlich der
+      // Konto-Pin (Reaudit R5, auth-p6d2c): weicht die verifizierte accountId
+      // vom bereits gespeicherten Konto ab, wird ebenfalls abgewiesen.
       const completed = await tokenStore.completePendingFlow(
         txId,
         clientId,
         email,
         Date.now(),
         polled.pair,
-        { login: verified.login, installations: verified.installations },
+        { login: verified.login, accountId: verified.accountId, installations: verified.installations },
       );
 
       if (!completed.ok) {
+        if (completed.reason === 'account_mismatch') {
+          // Terminaler Fehler (keine stale/racy Transaktion, sondern eine
+          // bewusst abgelehnte Identitaet): den Pending-Flow mit verwerfen,
+          // statt ihn bis zum natuerlichen Ablauf haengen zu lassen.
+          await tokenStore.clearPendingFlow(txId);
+          await tokenStore.recordEvent(
+            { type: 'bot_reconnect_rejected', actor: email, detail: 'account_mismatch' },
+            Date.now(),
+          );
+
+          return Response.json({ ok: false, reason: 'account_mismatch' }, { status: 409 });
+        }
+
         return Response.json({ ok: false, reason: 'unknown_transaction' }, { status: 400 });
       }
 

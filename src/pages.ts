@@ -439,7 +439,9 @@ ${
         setTimeout(poll, interval);
         return;
       }
-      document.getElementById('status').textContent = ${JSON.stringify(t.setup.failed)} + res.reason;
+      document.getElementById('status').textContent = res.reason === 'account_mismatch'
+        ? ${JSON.stringify(t.setup.accountMismatch)}
+        : ${JSON.stringify(t.setup.failed)} + res.reason;
     };
     setTimeout(poll, interval);
   });
@@ -718,7 +720,9 @@ function startWizardDeviceFlow() {
           }
           if (res.reason === 'slow_down') { interval += 5000; }
           if (res.reason === 'pending' || res.reason === 'slow_down') { setTimeout(poll, interval); return; }
-          document.getElementById('status').textContent = ${JSON.stringify(t.setup.failed)} + res.reason;
+          document.getElementById('status').textContent = res.reason === 'account_mismatch'
+            ? ${JSON.stringify(t.setup.accountMismatch)}
+            : ${JSON.stringify(t.setup.failed)} + res.reason;
           btn.disabled = false;
         });
       };
@@ -995,6 +999,7 @@ ${userTable}
     settings_updated: d.eventSettingsUpdated,
     bot_connected: d.eventBotConnected,
     bot_disconnected: d.eventBotDisconnected,
+    bot_reconnect_rejected: d.eventBotReconnectRejected,
     token_rotated: d.eventTokenRotated,
     token_rotate_failed: d.eventTokenRotateFailed,
     login_disabled: d.eventLoginDisabled,
@@ -1070,8 +1075,17 @@ ${eventsTable}
 <span class="k">${d.nextRotationLabel}</span><span class="v"><span class="localtime" data-iso="${nextRotationIso}">—</span></span>`
     : '';
 
+  // Konto-ID mit ausgeben (Reaudit R5, auth-p6d2c): sichtbarer Beleg des
+  // Konto-Pins, den `completePendingFlow` durchsetzt. Altbestand OHNE
+  // gespeicherte `accountId` (vor diesem Fix verbunden) hat trotz Typ
+  // `number` zur Laufzeit u.U. kein Feld — per `typeof` defensiv abgefangen
+  // (Iteration 2, Verifier-Fund: sonst rendert dies woertlich "undefined").
   const accountRow = status.account
-    ? `<span class="k">${d.accountLabel}</span><span class="v"><code>${escapeHtml(status.account.login)}</code> <span class="muted">· ${escapeHtml(d.installationsLabel(status.account.installations))}</span></span>`
+    ? `<span class="k">${d.accountLabel}</span><span class="v"><code>${escapeHtml(status.account.login)}</code> <span class="muted">${escapeHtml(
+        typeof status.account.accountId === 'number'
+          ? d.accountIdLabel(status.account.accountId)
+          : d.accountIdUnknownLabel,
+      )} · ${escapeHtml(d.installationsLabel(status.account.installations))}</span></span>`
     : '';
 
   const githubSection = `<div class="card full">
@@ -1400,7 +1414,9 @@ ${settingsRow(
             if (res.ok) { document.getElementById('status').textContent = ${JSON.stringify(t.setup.connected)}; return; }
             if (res.reason === 'slow_down') { interval += 5000; }
             if (res.reason === 'pending' || res.reason === 'slow_down') { setTimeout(poll, interval); return; }
-            document.getElementById('status').textContent = ${JSON.stringify(t.setup.failed)} + res.reason;
+            document.getElementById('status').textContent = res.reason === 'account_mismatch'
+              ? ${JSON.stringify(t.setup.accountMismatch)}
+              : ${JSON.stringify(t.setup.failed)} + res.reason;
           });
         };
         setTimeout(poll, interval);

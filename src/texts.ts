@@ -45,6 +45,12 @@ export interface Texts {
     startFailed: string;
     connected: string;
     failed: string;
+    /**
+     * Konto-Pin-Ablehnung (Reaudit R5, auth-p6d2c): ein Reconnect (ohne
+     * Disconnect) hat mit einem ANDEREN Konto abgeschlossen als dem bereits
+     * verbundenen. Verstaendlicher als der rohe `account_mismatch`-Reason.
+     */
+    accountMismatch: string;
     accessDenied: string;
     adminsOnly: string;
     locked: string;
@@ -134,7 +140,17 @@ export interface Texts {
     connectedBadge: string;
     notConnectedBadge: string;
     accountLabel: string;
-    installationsLabel: (count: number) => string;
+    accountIdLabel: (accountId: number) => string;
+    /**
+     * Altbestand OHNE gespeicherte `accountId` (vor dem Konto-Pin verbunden,
+     * Reaudit R5, auth-p6d2c): der Typ verlangt `number`, zur Laufzeit kann
+     * das Feld dennoch fehlen — die Anzeige darf dann NICHT "undefined" oder
+     * eine erfundene Zahl zeigen, sondern muss den ungepinnten Altbestand als
+     * solchen kenntlich machen (Iteration 2, Verifier-Fund).
+     */
+    accountIdUnknownLabel: string;
+    /** `count === null` -> Installations-Abfrage fehlgeschlagen ("unbekannt"), Reaudit R5 (auth-p6d2c). */
+    installationsLabel: (count: number | null) => string;
     tokenLabel: string;
     tokenShow: string;
     tokenHide: string;
@@ -165,6 +181,7 @@ export interface Texts {
     eventSettingsUpdated: string;
     eventBotConnected: string;
     eventBotDisconnected: string;
+    eventBotReconnectRejected: string;
     eventTokenRotated: string;
     eventTokenRotateFailed: string;
     eventLoginDisabled: string;
@@ -243,6 +260,8 @@ const de: Texts = {
     startFailed: 'Start fehlgeschlagen: ',
     connected: 'Verbunden! Der E-Mail-Login ist jetzt einsatzbereit.',
     failed: 'Fehlgeschlagen: ',
+    accountMismatch:
+      'Abgelehnt: Das autorisierte Konto weicht vom bereits verbundenen Konto ab. Für einen Kontowechsel zuerst die Verbindung trennen (Disconnect), dann erneut verbinden.',
     accessDenied: 'Zugriff verweigert.',
     adminsOnly: 'Zugriff verweigert: Diese Seite ist Administratoren vorbehalten.',
     locked:
@@ -372,7 +391,13 @@ const de: Texts = {
     connectedBadge: 'Verbunden',
     notConnectedBadge: 'Nicht verbunden',
     accountLabel: 'Verbundenes Konto',
-    installationsLabel: (count) => `${count} erreichbare Installation${count === 1 ? '' : 'en'}`,
+    accountIdLabel: (accountId) => `Konto-ID ${accountId}`,
+    accountIdUnknownLabel:
+      'Konto-ID unbekannt (vor dem Pinning verbunden — zum Pinnen einmal trennen und neu verbinden)',
+    installationsLabel: (count) =>
+      count === null
+        ? 'Installationen: unbekannt (Abfrage fehlgeschlagen)'
+        : `${count} erreichbare Installation${count === 1 ? '' : 'en'}`,
     tokenLabel: 'Aktuelles Token',
     tokenShow: 'Token anzeigen',
     tokenHide: 'Token verbergen',
@@ -404,6 +429,7 @@ const de: Texts = {
     eventSettingsUpdated: 'Einstellungen geändert',
     eventBotConnected: 'Bot verbunden',
     eventBotDisconnected: 'Verbindung getrennt',
+    eventBotReconnectRejected: 'Reconnect abgelehnt (anderes Konto)',
     eventTokenRotated: 'Token rotiert',
     eventTokenRotateFailed: 'Token-Rotation fehlgeschlagen',
     eventLoginDisabled: 'Login deaktiviert',
@@ -480,6 +506,8 @@ const en: Texts = {
     startFailed: 'Start failed: ',
     connected: 'Connected! Email sign-in is ready to use.',
     failed: 'Failed: ',
+    accountMismatch:
+      'Rejected: the authorized account differs from the account already connected. To switch accounts, disconnect first, then connect again.',
     accessDenied: 'Access denied.',
     adminsOnly: 'Access denied: this page is restricted to administrators.',
     locked: 'Setup is disabled: no administrators are configured (SETUP_ADMINS).',
@@ -607,7 +635,13 @@ const en: Texts = {
     connectedBadge: 'Connected',
     notConnectedBadge: 'Not connected',
     accountLabel: 'Connected account',
-    installationsLabel: (count) => `${count} reachable installation${count === 1 ? '' : 's'}`,
+    accountIdLabel: (accountId) => `Account ID ${accountId}`,
+    accountIdUnknownLabel:
+      'Account ID unknown (connected before pinning was introduced — disconnect and reconnect once to pin it)',
+    installationsLabel: (count) =>
+      count === null
+        ? 'Installations: unknown (query failed)'
+        : `${count} reachable installation${count === 1 ? '' : 's'}`,
     tokenLabel: 'Current token',
     tokenShow: 'Show token',
     tokenHide: 'Hide token',
@@ -639,6 +673,7 @@ const en: Texts = {
     eventSettingsUpdated: 'Settings changed',
     eventBotConnected: 'Bot connected',
     eventBotDisconnected: 'Disconnected',
+    eventBotReconnectRejected: 'Reconnect rejected (different account)',
     eventTokenRotated: 'Token rotated',
     eventTokenRotateFailed: 'Token rotation failed',
     eventLoginDisabled: 'Sign-in disabled',

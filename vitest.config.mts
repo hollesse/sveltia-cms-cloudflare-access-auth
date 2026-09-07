@@ -93,10 +93,24 @@ export default {
           return new Response('bad credentials', { status: 401 });
         }
 
+        // Zweites, DIFFERENT Konto fuer Konto-Pin-Tests (Reaudit R5, auth-p6d2c):
+        // ein Reconnect, der mit diesem Token abschliesst, darf ein bereits
+        // gespeichertes Konto nicht kommentarlos ersetzen.
+        if (auth.includes('ghu_other_account')) {
+          return json({ login: 'other-bot-account', id: 9999 });
+        }
+
         return json({ login: 'myclub-cms-bot', id: 4242 });
       }
 
       if (url.pathname === '/user/installations') {
+        // Simuliert eine fehlschlagende Installations-Abfrage (Reaudit R5,
+        // auth-p6d2c): GET /user bleibt gueltig, nur diese Abfrage schlaegt
+        // fehl -> installations muss null ("unbekannt") werden, nicht 0.
+        if (auth.includes('ghu_installations_down')) {
+          return new Response('mocked installations failure', { status: 500 });
+        }
+
         return json({ total_count: 1, installations: [{ id: 1 }] });
       }
 
@@ -116,6 +130,11 @@ export default {
         'client-pending': 'device-pending',
         'client-slow': 'device-slow',
         'client-badaccount': 'device-badaccount',
+        // Konto-Pin-Tests (Reaudit R5, auth-p6d2c): eigene Client-IDs, damit ein
+        // Reconnect ueber dieselbe txId/Admin-Session gezielt mit einem
+        // ANDEREN Konto bzw. einer fehlschlagenden Installations-Abfrage endet.
+        'client-otheraccount': 'device-otheraccount',
+        'client-installationsdown': 'device-installationsdown',
       };
 
       return json({
@@ -158,6 +177,24 @@ export default {
             access_token: 'ghu_bad',
             expires_in: 28800,
             refresh_token: 'refresh-ok',
+            token_type: 'bearer',
+          });
+        }
+
+        if (body.device_code === 'device-otheraccount') {
+          return json({
+            access_token: 'ghu_other_account',
+            expires_in: 28800,
+            refresh_token: 'refresh-other',
+            token_type: 'bearer',
+          });
+        }
+
+        if (body.device_code === 'device-installationsdown') {
+          return json({
+            access_token: 'ghu_installations_down',
+            expires_in: 28800,
+            refresh_token: 'refresh-installations-down',
             token_type: 'bearer',
           });
         }

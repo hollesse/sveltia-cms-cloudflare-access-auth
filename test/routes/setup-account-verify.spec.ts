@@ -2,6 +2,7 @@ import { env, runInDurableObject, SELF } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { verifyAuthorization } from '../../src/github.js';
 import type { TokenStore } from '../../src/token-store.js';
+import { pickTexts } from '../../src/texts.js';
 import type { Env } from '../../src/types.js';
 import { signTestAccessJwt } from '../helpers/access-identity.js';
 import { connectBot } from '../helpers/device-flow.js';
@@ -47,14 +48,22 @@ afterEach(() => {
 });
 
 describe('verifyAuthorization', () => {
-  it('returns the account login and reachable installation count', async () => {
+  it('returns the account login, accountId and reachable installation count', async () => {
     const result = await verifyAuthorization('ghu_ok');
-    expect(result).toMatchObject({ ok: true, login: 'myclub-cms-bot', installations: 1 });
+    expect(result).toMatchObject({ ok: true, login: 'myclub-cms-bot', accountId: 4242, installations: 1 });
   });
 
   it('fails for an invalid token', async () => {
     const result = await verifyAuthorization('ghu_bad');
     expect(result.ok).toBe(false);
+  });
+
+  // Reaudit R5 (auth-p6d2c): eine fehlschlagende Installations-Abfrage ist
+  // NICHT dasselbe wie "wirklich 0 Installationen" — `GET /user` bleibt
+  // gueltig, nur `GET /user/installations` schlaegt fehl (Mock: 5xx).
+  it('reports installations as null (unknown) when the installations query fails, not 0', async () => {
+    const result = await verifyAuthorization('ghu_installations_down');
+    expect(result).toMatchObject({ ok: true, login: 'myclub-cms-bot', installations: null });
   });
 });
 
@@ -82,5 +91,89 @@ describe('device-flow poll verifies the account before storing', () => {
     const status = await bot().status();
     expect(status.authorized).toBe(false);
     expect(status.account).toBeNull();
+  });
+
+  it('shows the accountId and "unknown" instead of "0" when the installations query failed', async () => {
+    testEnv.GITHUB_APP_CLIENT_ID = 'client-installationsdown';
+
+    const response = await connectBot(ORIGIN, await jsonHeaders());
+    expect(response.status).toBe(200);
+
+    const status = await bot().status();
+    expect(status.account).toMatchObject({ login: 'myclub-cms-bot', accountId: 4242, installations: null });
+
+    const dashboard = await SELF.fetch(`${ORIGIN}/setup`, {
+      headers: { 'Cf-Access-Jwt-Assertion': await signTestAccessJwt(AUD, ISSUER, { email: ADMIN }) },
+    });
+    const html = await dashboard.text();
+    expect(html).toContain('4242');
+    expect(html).not.toContain('0 erreichbare');
+  });
+});
+
+describe('device-flow poll pins the connected account (Reaudit R5, auth-p6d2c)', () => {
+  it('rejects a reconnect (no disconnect) that verifies as a DIFFERENT account, keeping the original account and token bound', async () => {
+    const first = await connectBot(ORIGIN, await jsonHeaders());
+    expect(first.status).toBe(200);
+
+    const afterFirst = await bot().status();
+    expect(afterFirst.account?.login).toBe('myclub-cms-bot');
+    const originalToken = afterFirst.accessToken;
+
+    // Reconnect ohne Disconnect: dieselbe Admin-Session startet einen neuen
+    // Device Flow, der aber mit einem ANDEREN GitHub-Konto abschliesst.
+    testEnv.GITHUB_APP_CLIENT_ID = 'client-otheraccount';
+    const second = await connectBot(ORIGIN, await jsonHeaders());
+
+    expect(second.status).toBe(409);
+    expect(await second.json()).toMatchObject({ ok: false, reason: 'account_mismatch' });
+
+    const afterSecond = await bot().status();
+    expect(afterSecond.account?.login).toBe('myclub-cms-bot');
+    expect(afterSecond.accessToken).toBe(originalToken);
+  });
+
+  it('shows the account-mismatch rejection reason understandably in the setup UI (de)', async () => {
+    const first = await connectBot(ORIGIN, await jsonHeaders());
+    expect(first.status).toBe(200);
+
+    testEnv.GITHUB_APP_CLIENT_ID = 'client-otheraccount';
+    const second = await connectBot(ORIGIN, await jsonHeaders());
+    expect(second.status).toBe(409);
+
+    const dashboard = await SELF.fetch(`${ORIGIN}/setup`, {
+      headers: { 'Cf-Access-Jwt-Assertion': await signTestAccessJwt(AUD, ISSUER, { email: ADMIN }) },
+    });
+    const html = await dashboard.text();
+    expect(html).toContain(pickTexts(null).setup.accountMismatch);
+  });
+});
+
+// Verifier-Fund Iteration 1 (auth-p6d2c): ein VOR diesem Fix gespeichertes
+// Konto (kein `accountId`, direkt in den Storage geschrieben — genau der
+// Fall, den `completePendingFlow` bewusst defensiv als "kein Pin" behandelt)
+// rief `d.accountIdLabel(status.account.accountId)` ohne Guard auf und
+// rendere woertlich "Konto-ID undefined". Muss stattdessen als "unbekannt"
+// erkennbar sein, nicht als undefined oder eine erfundene Zahl.
+describe('dashboard display of a legacy account stored without accountId (Reaudit R5, iteration 2)', () => {
+  it('shows neither "undefined" nor a fabricated account ID for a pre-fix legacy account', async () => {
+    await runInDurableObject(bot(), async (_instance: TokenStore, state) => {
+      await state.storage.put({
+        refreshToken: 'refresh-legacy',
+        accessToken: 'ghu_legacy',
+        expiresAt: Date.now() + 3_600_000,
+        'account:v1': { login: 'legacy-bot', installations: 2 },
+      });
+    });
+
+    const dashboard = await SELF.fetch(`${ORIGIN}/setup`, {
+      headers: { 'Cf-Access-Jwt-Assertion': await signTestAccessJwt(AUD, ISSUER, { email: ADMIN }) },
+    });
+    const html = await dashboard.text();
+
+    expect(html).toContain('legacy-bot');
+    expect(html).not.toContain('undefined');
+    expect(html).not.toMatch(/Konto-ID \d/);
+    expect(html).not.toMatch(/Account ID \d/);
   });
 });

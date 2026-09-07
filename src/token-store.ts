@@ -14,10 +14,24 @@ export type GetTokenResult =
   | { ok: true; token: string }
   | { ok: false; reason: 'not_authorized' | 'refresh_failed' | 'login_disabled' };
 
-/** Verifiziertes GitHub-Konto der aktuellen Autorisierung. */
+/**
+ * Verifiziertes GitHub-Konto der aktuellen Autorisierung. `accountId` ist der
+ * Konto-Pin (Reaudit R5, auth-p6d2c): siehe `completePendingFlow`. Jede NEUE
+ * Verifikation liefert `accountId` immer mit (`verifyAuthorization`); der Typ
+ * ist entsprechend verbindlich `number`. Altbestand, der VOR diesem Fix
+ * gespeichert wurde, kann das Feld zur Laufzeit dennoch nicht tragen (kein
+ * Migrations-Schritt) — `completePendingFlow` behandelt das defensiv als
+ * "kein Pin", statt dem Typ blind zu vertrauen.
+ */
 export interface AccountInfo {
   login: string;
-  installations: number;
+  accountId: number;
+  /**
+   * `null` = die Installations-Abfrage bei der letzten Verifikation ist
+   * fehlgeschlagen ("unbekannt") — bewusst UNTERSCHIEDEN von wirklich 0
+   * erreichbaren Installationen (Reaudit R5, auth-p6d2c).
+   */
+  installations: number | null;
 }
 
 export interface TokenStoreStatus {
@@ -179,6 +193,18 @@ export class TokenStore extends DurableObject<Env> {
    * aendern den gespeicherten Pending-Flow) lassen die Pruefung fehlschlagen,
    * OHNE dass etwas gespeichert oder der (dann fremde) Pending-Flow geloescht
    * wird.
+   *
+   * Konto-Pin (Reaudit R5, auth-p6d2c): existiert bereits ein gespeichertes
+   * Konto MIT bekannter `accountId`, wird der Abschluss zusaetzlich gegen
+   * dessen `accountId` geprueft — weicht sie ab, ist die Verifikation direkt
+   * nach den Pending-Flow-Checks abgewiesen (`account_mismatch`), OHNE dass
+   * das bestehende Konto/Token ueberschrieben wird. Ein gewollter Kontowechsel
+   * laeuft ausschliesslich ueber Disconnect (loescht Konto + Pin) + neuen
+   * Device Flow. Altbestand OHNE gespeicherte `accountId` (vor diesem Fix
+   * verbunden) hat noch keinen Pin — trotz des verbindlichen Typs `number`
+   * kann so ein Altdatensatz das Feld zur Laufzeit nicht tragen (kein
+   * Migrations-Schritt); der `typeof`-Check unten behandelt das defensiv als
+   * "ungepinnt" statt dem Typ blind zu vertrauen.
    */
   async completePendingFlow(
     txId: string,
@@ -187,7 +213,7 @@ export class TokenStore extends DurableObject<Env> {
     now: number,
     pair: TokenPair,
     account: AccountInfo,
-  ): Promise<{ ok: boolean }> {
+  ): Promise<{ ok: true } | { ok: false; reason: 'unknown_transaction' | 'account_mismatch' }> {
     const pending = await this.ctx.storage.get<PendingDeviceFlow>(PENDING_FLOW_KEY);
 
     if (
@@ -197,7 +223,17 @@ export class TokenStore extends DurableObject<Env> {
       pending.clientId !== clientId ||
       pending.expiresAt <= now
     ) {
-      return { ok: false };
+      return { ok: false, reason: 'unknown_transaction' };
+    }
+
+    const existingAccount = await this.ctx.storage.get<AccountInfo>(ACCOUNT_KEY);
+
+    if (
+      existingAccount &&
+      typeof existingAccount.accountId === 'number' &&
+      existingAccount.accountId !== account.accountId
+    ) {
+      return { ok: false, reason: 'account_mismatch' };
     }
 
     await this.ctx.storage.put({
