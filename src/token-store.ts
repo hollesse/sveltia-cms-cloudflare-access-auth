@@ -12,7 +12,7 @@ const MIN_REMAINING_MS = 15 * 60 * 1000;
 
 export type GetTokenResult =
   | { ok: true; token: string }
-  | { ok: false; reason: 'not_authorized' | 'refresh_failed' };
+  | { ok: false; reason: 'not_authorized' | 'refresh_failed' | 'login_disabled' };
 
 /** Verifiziertes GitHub-Konto der aktuellen Autorisierung. */
 export interface AccountInfo {
@@ -309,6 +309,18 @@ export class TokenStore extends DurableObject<Env> {
   /**
    * Login-Pfad: liefert das gecachte Access-Token; refresht nur im Notfall
    * (abgelaufen/knapp — z. B. nach verpassten Cron-Ticks).
+   *
+   * Ausgabeentscheidung (Reaudit R2, auth-f2t6w): `loginDisabled` liegt als
+   * Setting im SELBEN DO (`settings:v1`) und wird HIER, NACH allen Awaits
+   * (Cache-Read wie Notfall-Refresh) und unmittelbar vor der Rueckgabe,
+   * erneut geprueft — nicht nur einmal bei Request-Beginn in der Route. So
+   * gibt ein Login, der waehrend eines dieser Awaits gesperrt wird, trotz
+   * vorhandenem bzw. frisch geholtem Token kein Ergebnis mehr heraus. Der
+   * Refresh selbst laeuft unberuehrt durch und SPEICHERT das neue Paar
+   * (Rotation/Selbstheilung bleibt intakt, siehe `doRefresh`) — nur die
+   * Herausgabe an diesen Aufrufer wird verweigert. Die Pruefung liegt
+   * bewusst AUSSERHALB der koaleszierten `refreshInFlight`-Promise (die
+   * teilt sich der Cron-Pfad ueber `rotate`, der ungegated bleibt).
    */
   async getAccessToken(clientId: string): Promise<GetTokenResult> {
     const [accessToken, expiresAt] = await Promise.all([
@@ -316,15 +328,22 @@ export class TokenStore extends DurableObject<Env> {
       this.ctx.storage.get<number>('expiresAt'),
     ]);
 
-    if (
+    const result: GetTokenResult =
       accessToken !== undefined &&
       expiresAt !== undefined &&
       expiresAt - Date.now() > MIN_REMAINING_MS
-    ) {
-      return { ok: true, token: accessToken };
+        ? { ok: true, token: accessToken }
+        : await this.refresh(clientId);
+
+    if (result.ok) {
+      const settings = await this.getSettings();
+
+      if (settings.loginDisabled) {
+        return { ok: false, reason: 'login_disabled' };
+      }
     }
 
-    return this.refresh(clientId);
+    return result;
   }
 
   /** Cron-Pfad: rotiert unconditionally (0/6/12/18 Uhr UTC). */

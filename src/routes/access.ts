@@ -72,6 +72,14 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
   const tokenResult = await tokenStore.getAccessToken(config.githubAppClientId);
 
   if (!tokenResult.ok) {
+    // Reaudit R2 (auth-f2t6w): der Login-Refresh kann NACH dem obigen
+    // fruehen `loginDisabled`-Check gesperrt worden sein (Race waehrend eines
+    // laufenden Notfall-Refreshs) — derselbe Fehlertext/Status wie der
+    // fruehe Check, unabhaengig davon, WANN die Sperre gegriffen hat.
+    if (tokenResult.reason === 'login_disabled') {
+      return renderCallbackErrorPage(t.callbackError.loginDisabled, config.allowedDomains, t, 503);
+    }
+
     return renderCallbackErrorPage(
       tokenResult.reason === 'not_authorized'
         ? t.callbackError.notConnected
