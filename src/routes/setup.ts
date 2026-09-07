@@ -100,6 +100,7 @@ async function handleUpdateSettings(
   request: Request,
   tokenStore: ReturnType<Env['TOKEN_STORE']['get']>,
   presentedAud: string | undefined,
+  email: string,
 ): Promise<Response> {
   const body = (await request.json().catch(() => null)) as SettingsUpdateBody | null;
 
@@ -179,6 +180,10 @@ async function handleUpdateSettings(
   }
 
   const updated = await tokenStore.updateSettings(partial);
+  await tokenStore.recordEvent(
+    { type: 'settings_updated', actor: email, detail: Object.keys(body).join(', ') },
+    Date.now(),
+  );
 
   return Response.json({ ok: true, settings: updated });
 }
@@ -288,11 +293,12 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     }
 
     const users = await tokenStore.listUsers();
-    return renderDashboardPage(config, status, users, email, presentedAud, t);
+    const events = await tokenStore.listEvents();
+    return renderDashboardPage(config, status, users, events, email, presentedAud, t);
   }
 
   if (url.pathname === '/setup/settings' && request.method === 'POST') {
-    return handleUpdateSettings(request, tokenStore, presentedAud);
+    return handleUpdateSettings(request, tokenStore, presentedAud, email);
   }
 
   if (url.pathname === '/setup/github' && request.method === 'GET') {
@@ -315,6 +321,7 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
 
   if (url.pathname === '/setup/github/disconnect' && request.method === 'POST') {
     await tokenStore.clearAuthorization();
+    await tokenStore.recordEvent({ type: 'bot_disconnected', actor: email }, Date.now());
 
     return Response.json({ ok: true });
   }
@@ -345,6 +352,10 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     // Sofort-Rotation (Ops/Leak-Verdacht/T-3-Test): entwertet das ausgegebene
     // Token unmittelbar — gleiche Wirkung wie ein Cron-Tick.
     const rotated = await tokenStore.rotate(clientId);
+    await tokenStore.recordEvent(
+      { type: rotated.ok ? 'token_rotated' : 'token_rotate_failed', actor: email },
+      Date.now(),
+    );
 
     // Traegt das frische Access-Token -> nicht cachebar.
     return Response.json(rotated, {
@@ -368,6 +379,7 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
 
     if (polled.ok) {
       await tokenStore.storeAuthorization(polled.pair);
+      await tokenStore.recordEvent({ type: 'bot_connected', actor: email }, Date.now());
 
       return Response.json({ ok: true });
     }

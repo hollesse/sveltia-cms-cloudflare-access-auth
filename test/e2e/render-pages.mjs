@@ -45,6 +45,11 @@ export async function renderAllPages() {
   };
   const status = { authorized: true, expiresAt: now + 3_600_000, accessToken: 'ghu_bot_token' };
   const users = [{ email: 'redakteurin@example.com', firstSeen: now - 100_000, lastSeen: now }];
+  const events = [
+    { type: 'settings_updated', actor: 'admin@example.com', at: now - 200_000, detail: 'allowedDomains' },
+    { type: 'bot_connected', actor: 'admin@example.com', at: now - 100_000 },
+    { type: 'token_rotated', actor: 'admin@example.com', at: now },
+  ];
   const missing = { ok: false, reason: 'missing_required', missingKeys: ['ACCESS_TEAM_DOMAIN'] };
 
   const rendered = [];
@@ -56,7 +61,7 @@ export async function renderAllPages() {
     for (let step = 1; step <= 7; step += 1) {
       add(`wizard-step-${step}`, p.renderWizardPage(step, config, 'admin@example.com', 'aud-value', 'https://worker.example.com', t));
     }
-    add('dashboard', p.renderDashboardPage(config, status, users, 'admin@example.com', 'aud-value', t));
+    add('dashboard', p.renderDashboardPage(config, status, users, events, 'admin@example.com', 'aud-value', t));
     add('callback-success', p.renderCallbackSuccessPage({ provider: 'github', token: 'ghu_bot_token' }, ['cms.example.com'], t));
     add('callback-error', p.renderCallbackErrorPage('Beispiel-Fehler', ['cms.example.com'], t));
     add('selection', p.renderSelectionPage('https://worker.example.com/auth/github?site_id=cms.example.com', 'https://worker.example.com/auth/access?site_id=cms.example.com', 'cms.example.com', t));

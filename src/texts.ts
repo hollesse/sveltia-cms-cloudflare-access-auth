@@ -137,6 +137,19 @@ export interface Texts {
     disconnectHint: string;
     collapseLabel: string;
     toggleMenuTitle: string;
+    navAudit: string;
+    auditTitle: string;
+    auditText: string;
+    auditEmpty: string;
+    auditColTime: string;
+    auditColActor: string;
+    auditColType: string;
+    auditRetentionNote: string;
+    eventSettingsUpdated: string;
+    eventBotConnected: string;
+    eventBotDisconnected: string;
+    eventTokenRotated: string;
+    eventTokenRotateFailed: string;
   };
 }
 
@@ -347,6 +360,20 @@ const de: Texts = {
     disconnectHint: 'Löscht das gespeicherte Token-Paar; der Wizard fragt die Verbindung danach neu ab. Vollständiger Widerruf: GitHub-Einstellungen des Bot-Accounts.',
     collapseLabel: 'Einklappen',
     toggleMenuTitle: 'Menü ein-/ausklappen',
+    navAudit: 'Audit-Log',
+    auditTitle: 'Audit-Log',
+    auditText:
+      'Unveränderliche Sicherheitsereignisse (wer wann was geändert hat) — ohne Tokenwerte, nicht löschbar. Ergänzt den Anmeldeverlauf.',
+    auditEmpty: 'Noch keine Ereignisse.',
+    auditColTime: 'Zeit',
+    auditColActor: 'Akteur',
+    auditColType: 'Ereignis',
+    auditRetentionNote: 'Die letzten 200 Ereignisse werden vorgehalten.',
+    eventSettingsUpdated: 'Einstellungen geändert',
+    eventBotConnected: 'Bot verbunden',
+    eventBotDisconnected: 'Verbindung getrennt',
+    eventTokenRotated: 'Token rotiert',
+    eventTokenRotateFailed: 'Token-Rotation fehlgeschlagen',
   },
 };
 
@@ -553,6 +580,20 @@ const en: Texts = {
     disconnectHint: 'Deletes the stored token pair; the wizard will ask to connect again. Full revocation: the bot account\'s GitHub settings.',
     collapseLabel: 'Collapse',
     toggleMenuTitle: 'Collapse/expand menu',
+    navAudit: 'Audit log',
+    auditTitle: 'Audit log',
+    auditText:
+      'Immutable security events (who changed what, when) — no token values, not deletable. Complements the sign-in history.',
+    auditEmpty: 'No events yet.',
+    auditColTime: 'Time',
+    auditColActor: 'Actor',
+    auditColType: 'Event',
+    auditRetentionNote: 'The most recent 200 events are retained.',
+    eventSettingsUpdated: 'Settings changed',
+    eventBotConnected: 'Bot connected',
+    eventBotDisconnected: 'Disconnected',
+    eventTokenRotated: 'Token rotated',
+    eventTokenRotateFailed: 'Token rotation failed',
   },
 };
 

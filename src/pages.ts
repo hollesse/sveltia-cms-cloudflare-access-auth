@@ -1,7 +1,7 @@
 import { buildAllowedOrigins } from './config.js';
 import type { LoadedConfig, MissingRequiredConfig } from './config.js';
 import type { Texts } from './texts.js';
-import type { TokenStoreStatus, UserRecord } from './token-store.js';
+import type { AuditEvent, TokenStoreStatus, UserRecord } from './token-store.js';
 
 /**
  * Design-Tokens und Komponentenstile (design-system-001, abgenommen
@@ -85,6 +85,7 @@ const ICON_EYE = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" st
 const ICON_TRASH = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>`;
 const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 4.2A11 11 0 0 1 12 4c7 0 11 8 11 8a19 19 0 0 1-3 3.9M6.1 6.1A19 19 0 0 0 1 12s4 8 11 8a11 11 0 0 0 5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M1 1l22 22"/></svg>`;
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`;
+const ICON_AUDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a2 2 0 0 1 2 2v13l-3-2-2 2-2-2-3 2V6a2 2 0 0 1 2-2Z"/><path d="M9.5 9h5M9.5 12.5h5"/></svg>`;
 
 /**
  * Zusaetzliche Design-Tokens fuer Wizard + Verwaltung (design-system-001,
@@ -888,6 +889,7 @@ export function renderDashboardPage(
   config: LoadedConfig,
   status: TokenStoreStatus,
   users: UserRecord[],
+  events: AuditEvent[],
   email: string,
   presentedAud: string | undefined,
   t: Texts,
@@ -930,6 +932,41 @@ export function renderDashboardPage(
 ${manageBtn}
 <h3 class="subhead">${d.usersHistoryTitle}</h3>
 ${userTable}
+</div>`;
+
+  const eventLabels: Record<string, string> = {
+    settings_updated: d.eventSettingsUpdated,
+    bot_connected: d.eventBotConnected,
+    bot_disconnected: d.eventBotDisconnected,
+    token_rotated: d.eventTokenRotated,
+    token_rotate_failed: d.eventTokenRotateFailed,
+  };
+
+  const eventRows = events
+    .map((e) => {
+      const label = eventLabels[e.type] ?? e.type;
+      const detail = e.detail ? ` <span class="muted">(${escapeHtml(e.detail)})</span>` : '';
+
+      return `<tr>
+<td><span class="localtime" data-iso="${new Date(e.at).toISOString()}">—</span></td>
+<td>${escapeHtml(e.actor)}</td>
+<td>${escapeHtml(label)}${detail}</td>
+</tr>`;
+    })
+    .join('');
+
+  const eventsTable = events.length === 0
+    ? `<p class="muted">${d.auditEmpty}</p>`
+    : `<div class="tablewrap"><table class="usertable">
+<thead><tr><th>${d.auditColTime}</th><th>${d.auditColActor}</th><th>${d.auditColType}</th></tr></thead>
+<tbody>${eventRows}</tbody>
+</table></div>`;
+
+  const auditSection = `<div class="card full">
+<h2>${d.auditTitle}</h2>
+<p>${d.auditText}</p>
+${eventsTable}
+<p class="muted" style="margin-top:12px">${d.auditRetentionNote}</p>
 </div>`;
 
   const badge = status.authorized
@@ -1039,6 +1076,7 @@ ${settingsRow(
 <button class="navbtn active" data-section="users">${ICON_USERS}<span>${d.navUsers}</span></button>
 <button class="navbtn" data-section="github">${ICON_GITHUB}<span>${d.navGithub}</span></button>
 <button class="navbtn" data-section="settings">${ICON_GEAR}<span>${d.navSettings}</span></button>
+<button class="navbtn" data-section="audit">${ICON_AUDIT}<span>${d.navAudit}</span></button>
 </div>
 <button class="navbtn navtoggle" id="navtoggle" title="${escapeHtmlAttribute(d.toggleMenuTitle)}" aria-label="${escapeHtmlAttribute(d.toggleMenuTitle)}">${ICON_CHEVRON}<span>${d.collapseLabel}</span></button>
 </nav>
@@ -1046,6 +1084,7 @@ ${settingsRow(
 <div class="section active" data-section="users">${usersSection}</div>
 <div class="section" data-section="github">${githubSection}</div>
 <div class="section" data-section="settings">${settingsSection}</div>
+<div class="section" data-section="audit">${auditSection}</div>
 </div>
 </div>
 <script>${WIZARD_SCRIPT}
