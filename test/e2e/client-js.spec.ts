@@ -51,4 +51,21 @@ test.describe('interactive client behaviour', () => {
     await expect(shell).toHaveClass(/collapsed/);
     expect(await page.evaluate(() => localStorage.getItem('sidebarCollapsed'))).toBe('1');
   });
+
+  test('account menu opens on click, exposes the logout link, and closes on outside click', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+
+    const menu = page.locator('#usermenu');
+    const logout = page.locator('#usermenu a[href="/cdn-cgi/access/logout"]');
+    await expect(menu).toBeHidden();
+
+    await page.locator('#usermenuBtn').click();
+    await expect(menu).toBeVisible();
+    await expect(logout).toBeVisible();
+    await expect(page.locator('#usermenuBtn')).toHaveAttribute('aria-expanded', 'true');
+
+    await page.locator('.brand').click();
+    await expect(menu).toBeHidden();
+  });
 });
