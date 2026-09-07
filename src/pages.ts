@@ -941,8 +941,8 @@ ${userTable}
     bot_disconnected: d.eventBotDisconnected,
     token_rotated: d.eventTokenRotated,
     token_rotate_failed: d.eventTokenRotateFailed,
-    issuance_locked: d.eventIssuanceLocked,
-    issuance_unlocked: d.eventIssuanceUnlocked,
+    login_disabled: d.eventLoginDisabled,
+    login_enabled: d.eventLoginEnabled,
   };
 
   const eventRows = events
@@ -976,10 +976,14 @@ ${eventsTable}
     ? `<span class="badge ok">${d.connectedBadge}</span>`
     : `<span class="badge">${d.notConnectedBadge}</span>`;
 
-  const issuanceLocked = config.tokenIssuanceDisabled;
-  const lockBadge = issuanceLocked
-    ? ` <span class="badge btn-danger">${d.killSwitchLockedBadge}</span>`
-    : '';
+  const loginDisabled = config.loginDisabled;
+  const loginBadge = loginDisabled
+    ? `<span class="badge btn-danger">${d.loginDisabledBadge}</span>`
+    : `<span class="badge ok">${d.loginActiveBadge}</span>`;
+  const loginToggleRow = `<span class="k">${d.loginToggleLabel}</span><span class="v">${loginBadge}
+<button class="btn ${loginDisabled ? '' : 'btn-danger'}" id="loginToggleBtn" data-disabled="${loginDisabled ? '1' : '0'}" style="margin-left:8px">${loginDisabled ? d.loginEnableButton : d.loginDisableButton}</button>
+<span class="muted" style="display:block;margin-top:6px">${d.loginToggleHint}</span>
+</span>`;
 
   // Naechste Cron-Rotation (0/6/12/18 UTC) serverseitig als ISO bestimmen;
   // die Umrechnung in die Nutzer-Zeitzone macht der Client (localizeTimes()).
@@ -1014,7 +1018,7 @@ ${eventsTable}
   const githubSection = `<div class="card full">
 <h2>${d.githubTitle}</h2>
 <div class="kv">
-<span class="k">${d.statusLabel}</span><span>${badge}${lockBadge}</span>
+<span class="k">${d.statusLabel}</span><span>${badge}</span>
 ${accountRow}
 ${tokenRow}
 ${settingsRow(
@@ -1032,10 +1036,6 @@ ${settingsRow(
 <button class="btn btn-danger" id="disconnectBtn" title="${escapeHtmlAttribute(d.disconnectHint)}">${d.disconnectButton}</button>
 </div>
 <p id="rotateStatus" class="muted"></p>
-<div class="row">
-<button class="btn btn-danger" id="issuanceBtn" data-locked="${issuanceLocked ? '1' : '0'}" title="${escapeHtmlAttribute(d.killSwitchHint)}">${issuanceLocked ? d.killSwitchUnlockButton : d.killSwitchLockButton}</button>
-</div>
-<p class="muted" style="margin-top:8px">${d.killSwitchHint}</p>
 <div id="flow" hidden>
   <p>${t.setup.flowStep1} <strong id="code" style="font-size:1.5em"></strong></p>
   <p>2. <a id="verify" target="_blank" rel="noopener">github.com/login/device</a>
@@ -1047,6 +1047,7 @@ ${settingsRow(
   const settingsSection = `<div class="card full">
 <h2>${d.settingsTitle}</h2>
 <div class="kv">
+${loginToggleRow}
 ${settingsRow(
   d.fieldAccessAppAud,
   config.accessAppAud,
@@ -1239,15 +1240,16 @@ ${settingsRow(
         .then(function () { location.reload(); });
     });
   }
-  var issuanceBtn = document.getElementById('issuanceBtn');
-  if (issuanceBtn) {
-    issuanceBtn.addEventListener('click', function () {
-      var locked = issuanceBtn.getAttribute('data-locked') === '1';
-      if (!locked && !window.confirm(${JSON.stringify(d.killSwitchLockConfirm)})) { return; }
-      issuanceBtn.disabled = true;
-      fetch('/setup/issuance', {
+  var loginToggleBtn = document.getElementById('loginToggleBtn');
+  if (loginToggleBtn) {
+    loginToggleBtn.addEventListener('click', function () {
+      var currentlyDisabled = loginToggleBtn.getAttribute('data-disabled') === '1';
+      // Nur beim Deaktivieren rueckfragen; Wiederaktivieren ist unkritisch.
+      if (!currentlyDisabled && !window.confirm(${JSON.stringify(d.loginDisableConfirm)})) { return; }
+      loginToggleBtn.disabled = true;
+      fetch('/setup/login', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ disabled: !locked }),
+        body: JSON.stringify({ disabled: !currentlyDisabled }),
       }).then(function (r) { return r.json(); }).then(function () { location.reload(); });
     });
   }

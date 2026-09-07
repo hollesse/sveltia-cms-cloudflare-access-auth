@@ -27,9 +27,9 @@ async function seedBotToken(): Promise<void> {
   );
 }
 
-async function setIssuanceLocked(locked: boolean): Promise<void> {
+async function setLoginDisabled(disabled: boolean): Promise<void> {
   await runInDurableObject(botStub(), (instance: TokenStore) =>
-    instance.updateSettings({ tokenIssuanceDisabled: locked }),
+    instance.updateSettings({ loginDisabled: disabled }),
   );
 }
 
@@ -60,10 +60,10 @@ afterEach(() => {
   Object.assign(testEnv, originalEnv);
 });
 
-describe('token issuance kill-switch', () => {
-  it('withholds the token when issuance is locked, even with a valid Access-JWT', async () => {
+describe('editor login toggle', () => {
+  it('withholds the token when login is disabled, even with a valid Access-JWT', async () => {
     await seedBotToken();
-    await setIssuanceLocked(true);
+    await setLoginDisabled(true);
 
     const response = await requestToken();
 
@@ -74,10 +74,10 @@ describe('token issuance kill-switch', () => {
     expect(body).not.toContain("':success:'");
   });
 
-  it('resumes normal issuance once the lock is lifted', async () => {
+  it('resumes normal sign-in once login is re-enabled', async () => {
     await seedBotToken();
-    await setIssuanceLocked(true);
-    await setIssuanceLocked(false);
+    await setLoginDisabled(true);
+    await setLoginDisabled(false);
 
     const response = await requestToken();
 

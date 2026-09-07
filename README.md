@@ -300,12 +300,13 @@ every token currently out there stops working immediately. Note that a still-val
 Cloudflare Access session can then fetch a fresh token right away; rotation
 invalidates the *leaked* token, it is not a global logout.
 
-**If you need to stop all issuance right now.** Click *Lock token issuance* in the
-dashboard's GitHub section. While locked, `/auth/access` hands out no token at all —
-even to a valid, still-open Access session — until you unlock it again. Use this as
-the immediate emergency brake when rotating alone isn't enough (e.g. an Access
-session you can't yet revoke); the internal cron refresh keeps the vault current in
-the meantime, so unlocking restores normal operation instantly.
+**If you need to stop everyone signing in right now.** Toggle *Editor sign-in* off
+under **Settings**. While disabled, `/auth/access` hands out no token at all — even
+to a valid, still-open Access session — until you enable it again. Use it for a
+planned maintenance window, or as the immediate emergency brake when rotating alone
+isn't enough (e.g. an Access session you can't yet revoke); the internal cron refresh
+keeps the vault current in the meantime, so re-enabling restores normal operation
+instantly. Each toggle is recorded in the audit log.
 
 **If sign-in suddenly fails for everyone.** GitHub may have revoked the bot's
 authorization (e.g. the bot account changed its password). The login shows a

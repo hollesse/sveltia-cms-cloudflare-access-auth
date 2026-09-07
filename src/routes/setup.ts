@@ -35,7 +35,7 @@ const JSON_POST_PATHS = new Set([
   '/setup/settings',
   '/setup/github/poll',
   '/setup/users/delete',
-  '/setup/issuance',
+  '/setup/login',
 ]);
 
 /**
@@ -320,16 +320,16 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     return Response.json(started, { status: started.ok ? 200 : 502 });
   }
 
-  if (url.pathname === '/setup/issuance' && request.method === 'POST') {
+  if (url.pathname === '/setup/login' && request.method === 'POST') {
     const body = (await request.json().catch(() => null)) as { disabled?: boolean } | null;
 
     if (!body || typeof body.disabled !== 'boolean') {
       return Response.json({ ok: false, reason: 'invalid_body' }, { status: 400 });
     }
 
-    await tokenStore.updateSettings({ tokenIssuanceDisabled: body.disabled });
+    await tokenStore.updateSettings({ loginDisabled: body.disabled });
     await tokenStore.recordEvent(
-      { type: body.disabled ? 'issuance_locked' : 'issuance_unlocked', actor: email },
+      { type: body.disabled ? 'login_disabled' : 'login_enabled', actor: email },
       Date.now(),
     );
 
