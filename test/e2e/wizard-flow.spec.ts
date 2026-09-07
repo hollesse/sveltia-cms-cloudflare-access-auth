@@ -19,6 +19,7 @@ const stepHtml = (n: number): string => {
 test('connect the bot via device flow, then approve a domain', async ({ page }) => {
   let phase: 'connect' | 'domains' | 'authurl' = 'connect';
   const calls: string[] = [];
+  let polledTxId: unknown;
 
   await page.route('https://e2e.test/**', async (route) => {
     const request = route.request();
@@ -38,11 +39,12 @@ test('connect the bot via device flow, then approve a domain', async ({ page }) 
         ok: true,
         userCode: 'ABCD-1234',
         verificationUri: 'https://github.com/login/device',
-        deviceCode: 'device-ok',
+        txId: 'tx-test-1234',
         interval: 1,
       });
     }
     if (url.pathname === '/setup/github/poll') {
+      polledTxId = (JSON.parse(request.postData() ?? '{}') as { txId?: unknown }).txId;
       phase = 'domains'; // Zustimmung erfolgt -> nächster GET /setup zeigt Domains-Schritt
       return json({ ok: true });
     }
@@ -74,4 +76,6 @@ test('connect the bot via device flow, then approve a domain', async ({ page }) 
   expect(calls).toContain('POST /setup/github/start');
   expect(calls).toContain('POST /setup/github/poll');
   expect(calls).toContain('POST /setup/settings');
+  // Der Browser reicht nur die opaque txId zurück — nie den rohen device_code.
+  expect(polledTxId).toBe('tx-test-1234');
 });

@@ -4,9 +4,10 @@ import { verifyAuthorization } from '../../src/github.js';
 import type { TokenStore } from '../../src/token-store.js';
 import type { Env } from '../../src/types.js';
 import { signTestAccessJwt } from '../helpers/access-identity.js';
+import { connectBot } from '../helpers/device-flow.js';
 
 /**
- * Setup-Konto-Verifikation (auth-v8n3c): nach dem Device Flow wird das
+ * Setup-Konto-Verifikation: nach dem Device Flow wird das
  * autorisierte GitHub-Konto per `GET /user` verifiziert (welches Konto? wie
  * viele erreichbare App-Installationen?) BEVOR gespeichert wird. Schlägt die
  * Verifikation fehl (ungültiges Token), wird die Autorisierung NICHT gespeichert.
@@ -26,14 +27,6 @@ const jsonHeaders = async () => ({
   origin: ORIGIN,
   'content-type': 'application/json',
 });
-const poll = (deviceCode: string) =>
-  jsonHeaders().then((headers) =>
-    SELF.fetch(`${ORIGIN}/setup/github/poll`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ deviceCode }),
-    }),
-  );
 
 beforeEach(async () => {
   originalEnv = { ...testEnv };
@@ -67,7 +60,7 @@ describe('verifyAuthorization', () => {
 
 describe('device-flow poll verifies the account before storing', () => {
   it('stores the verified account and shows it on the dashboard', async () => {
-    const response = await poll('device-ok');
+    const response = await connectBot(ORIGIN, await jsonHeaders());
     expect(response.status).toBe(200);
 
     const status = await bot().status();
@@ -81,7 +74,9 @@ describe('device-flow poll verifies the account before storing', () => {
   });
 
   it('does NOT store when account verification fails (invalid token)', async () => {
-    const response = await poll('device-badaccount');
+    testEnv.GITHUB_APP_CLIENT_ID = 'client-badaccount';
+
+    const response = await connectBot(ORIGIN, await jsonHeaders());
     expect(response.status).toBe(502);
 
     const status = await bot().status();

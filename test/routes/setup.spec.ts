@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TokenStore } from '../../src/token-store.js';
 import type { Env } from '../../src/types.js';
 import { signTestAccessJwt } from '../helpers/access-identity.js';
+import { connectBot } from '../helpers/device-flow.js';
 
 const testEnv = env as unknown as Env;
 
@@ -110,11 +111,7 @@ describe('/setup/github', () => {
   });
 
   it('stores the token pair once polling succeeds', async () => {
-    const response = await SELF.fetch('https://worker.example.com/setup/github/poll', {
-      method: 'POST',
-      headers: { ...(await authedHeaders()), 'content-type': 'application/json' },
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
-    });
+    const response = await connectBot('https://worker.example.com', await authedHeaders());
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
@@ -126,11 +123,9 @@ describe('/setup/github', () => {
   });
 
   it('relays pending polls without storing anything', async () => {
-    const response = await SELF.fetch('https://worker.example.com/setup/github/poll', {
-      method: 'POST',
-      headers: { ...(await authedHeaders()), 'content-type': 'application/json' },
-      body: JSON.stringify({ deviceCode: 'device-pending' }),
-    });
+    testEnv.GITHUB_APP_CLIENT_ID = 'client-pending';
+
+    const response = await connectBot('https://worker.example.com', await authedHeaders());
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: false, reason: 'pending' });

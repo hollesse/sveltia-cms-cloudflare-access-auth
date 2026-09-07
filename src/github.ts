@@ -183,7 +183,7 @@ function apiHeaders(accessToken: string): Record<string, string> {
 /**
  * Verifiziert direkt nach dem Device Flow, WELCHES GitHub-Konto autorisiert hat
  * (`GET /user`) und wie viele App-Installationen das Token erreicht
- * (`GET /user/installations`) — auth-v8n3c. Die Identitaet ist das Gate: ein
+ * (`GET /user/installations`) Die Identitaet ist das Gate: ein
  * ungueltiges Token / fehlgeschlagenes `GET /user` liefert `ok: false`, sodass
  * der Aufrufer NICHT speichert (statt still eine kaputte/falsche Verbindung
  * abzulegen). Die Installations-Zahl ist best effort (informativ).

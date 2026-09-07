@@ -415,7 +415,7 @@ ${
       const res = await fetch('/setup/github/poll', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ deviceCode: started.deviceCode }),
+        body: JSON.stringify({ txId: started.txId }),
       }).then((r) => r.json());
       if (res.ok) {
         document.getElementById('status').textContent = ${JSON.stringify(t.setup.connected)};
@@ -696,7 +696,7 @@ function startWizardDeviceFlow() {
         fetch('/setup/github/poll', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ deviceCode: started.deviceCode }),
+          body: JSON.stringify({ txId: started.txId }),
         }).then(function (r) { return r.json(); }).then(function (res) {
           if (res.ok) {
             document.getElementById('status').textContent = ${JSON.stringify(t.setup.connected)};
@@ -1357,7 +1357,7 @@ ${settingsRow(
           fetch('/setup/github/poll', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ deviceCode: started.deviceCode }),
+            body: JSON.stringify({ txId: started.txId }),
           }).then(function (r) { return r.json(); }).then(function (res) {
             if (res.ok) { document.getElementById('status').textContent = ${JSON.stringify(t.setup.connected)}; return; }
             if (res.reason === 'slow_down') { interval += 5000; }
