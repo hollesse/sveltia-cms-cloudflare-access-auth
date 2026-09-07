@@ -145,3 +145,79 @@ describe('GitHub-Delegations-Proxy (Option C, §7.6)', () => {
     expect(joined).not.toContain('CF_Authorization');
   });
 });
+
+// R4 (Security-Reaudit gegen e36538c): der Proxy reichte `cache-control` nur
+// durch, WENN der Upstream es lieferte — lieferte er nichts, ging `/callback`
+// (traegt persoenliche GitHub-Tokens!) ohne no-store/Sicherheitsheader raus;
+// einen oeffentlichen Upstream-Wert haette der Worker sogar unveraendert
+// weitergegeben. Bewusst KEINE CSP auf Proxy-Antworten: die
+// Upstream-Callback-Seite nutzt Inline-Script fuer den postMessage-Handover
+// (`authorization:github:success`) — eine CSP bräuchte `unsafe-inline` und
+// waere wertlos.
+describe('Proxy-Antworten erzwingen no-store und Sicherheitsheader (R4)', () => {
+  const expectForcedHeaders = (response: Response): void => {
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+  };
+
+  it('erzwingt die Sicherheitsheader auf /callback, wenn der Upstream keinen cache-control liefert', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/callback?code=abc&state=teststate',
+      {
+        headers: { cookie: 'csrf-token=github_00000000000000000000000000000000' },
+        redirect: 'manual',
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expectForcedHeaders(response);
+  });
+
+  it('ueberschreibt einen oeffentlichen Upstream-cache-control auf /callback mit no-store', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/callback?code=abc&state=teststate&simulate_cache=public',
+      {
+        headers: { cookie: 'csrf-token=github_00000000000000000000000000000000' },
+        redirect: 'manual',
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expectForcedHeaders(response);
+  });
+
+  it('erzwingt die Sicherheitsheader auch auf dem 302-Redirect von /auth/github', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/auth/github?site_id=cms.example.com',
+      { redirect: 'manual' },
+    );
+
+    expect(response.status).toBe(302);
+    expectForcedHeaders(response);
+  });
+
+  it('ueberschreibt einen oeffentlichen Upstream-cache-control auch auf dem 302-Redirect', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/auth/github?site_id=cms.example.com&simulate_cache=public',
+      { redirect: 'manual' },
+    );
+
+    expect(response.status).toBe(302);
+    expectForcedHeaders(response);
+  });
+
+  it('erzwingt die Sicherheitsheader auch auf dem 502-Fehlerpfad (Upstream nicht erreichbar)', async () => {
+    const response = await SELF.fetch(
+      'https://worker.example.com/callback?code=abc&state=teststate&simulate_upstream_down=1',
+      {
+        headers: { cookie: 'csrf-token=github_00000000000000000000000000000000' },
+        redirect: 'manual',
+      },
+    );
+
+    expect(response.status).toBe(502);
+    expectForcedHeaders(response);
+  });
+});

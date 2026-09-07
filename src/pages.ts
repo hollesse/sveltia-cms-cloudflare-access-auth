@@ -256,15 +256,27 @@ ${footerHtml(lang)}
 </html>`;
 
 /**
- * Security-Header fuer alle vom Worker gerenderten Seiten: nicht cachebar (die
- * Seiten tragen teils Tokens/E-Mails), nicht einbettbar (Clickjacking-Schutz
- * per CSP + X-Frame-Options), kein MIME-Sniffing, kein Referrer-Leak.
+ * Security-Header, die JEDE Antwort des Workers tragen muss — auch die
+ * durchgereichten Antworten des GitHub-Delegations-Proxys (`github-proxy.ts`,
+ * R4-Haertung): nicht cachebar (Tokens/E-Mails), kein MIME-Sniffing, kein
+ * Referrer-Leak, nicht einbettbar per X-Frame-Options. Exportiert, damit der
+ * Proxy diese Werte teilt statt dupliziert.
  */
-const SECURITY_HEADERS: Record<string, string> = {
+export const PROXY_SECURITY_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
+};
+
+/**
+ * Security-Header fuer alle vom Worker gerenderten Seiten: ergaenzt
+ * `PROXY_SECURITY_HEADERS` um eine CSP (Clickjacking-Schutz). Die CSP bleibt
+ * bewusst auf den eigenen Seiten beschraenkt — auf durchgereichten
+ * Proxy-Antworten waere sie wertlos, s. `github-proxy.ts`.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  ...PROXY_SECURITY_HEADERS,
   'content-security-policy': "frame-ancestors 'none'",
 };
 

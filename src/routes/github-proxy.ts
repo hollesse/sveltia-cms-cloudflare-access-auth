@@ -1,4 +1,5 @@
 import type { LoadedConfig } from '../config.js';
+import { PROXY_SECURITY_HEADERS } from '../pages.js';
 
 /**
  * Option C aus REQUIREMENTS §7.6 (Zwei-Origin-Problem): Der GitHub-Weg wird
@@ -113,13 +114,19 @@ export async function handleGithubProxy(
   } catch {
     return new Response(
       'Der GitHub-Login-Dienst ist derzeit nicht erreichbar. Bitte spaeter erneut versuchen.',
-      { status: 502, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+      {
+        status: 502,
+        headers: { 'content-type': 'text/plain; charset=utf-8', ...PROXY_SECURITY_HEADERS },
+      },
     );
   }
 
   const responseHeaders = new Headers();
 
-  for (const name of ['content-type', 'location', 'cache-control']) {
+  // `cache-control` bewusst NICHT in dieser Liste (R4): der Wert wird unten
+  // erzwungen, ein Upstream-Wert (auch ein oeffentlicher) darf ihn nie
+  // aufweichen. `/callback` traegt einen persoenlichen GitHub-Token.
+  for (const name of ['content-type', 'location']) {
     const value = upstream.headers.get(name);
 
     if (value !== null) {
@@ -133,6 +140,15 @@ export async function handleGithubProxy(
     if (isProxiedSetCookie(cookie)) {
       responseHeaders.append('set-cookie', cookie);
     }
+  }
+
+  // Sicherheitsheader auf JEDER Proxy-Antwort erzwingen (auch Redirects) —
+  // geteilt mit den eigenen Seiten (`pages.ts`), aber bewusst OHNE CSP: die
+  // Upstream-Callback-Seite nutzt Inline-Script fuer den postMessage-Handover
+  // (`authorization:github:success`); eine CSP bräuchte `unsafe-inline` und
+  // waere wertlos.
+  for (const [name, value] of Object.entries(PROXY_SECURITY_HEADERS)) {
+    responseHeaders.set(name, value);
   }
 
   return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });

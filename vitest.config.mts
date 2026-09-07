@@ -28,16 +28,27 @@ export default {
 
     // Mock des externen sveltia-cms-auth (Option-C-Proxy-Tests).
     if (url.hostname === 'sveltia-cms-auth.example.net') {
+      // Simuliert einen nicht erreichbaren Upstream (Proxy-Header-Test R4:
+      // die Sicherheitsheader muessen auch auf dem 502-Fehlerpfad stehen).
+      if (url.searchParams.get('simulate_upstream_down') === '1') {
+        throw new Error('simulated upstream network failure');
+      }
+
       if (url.pathname === '/auth') {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location:
-              'https://github.com/login/oauth/authorize?client_id=ext&state=teststate&scope=repo&site=' +
-              (url.searchParams.get('site_id') ?? ''),
-            'set-cookie': 'csrf-token=github_00000000000000000000000000000000; HttpOnly; Path=/; Max-Age=600; SameSite=Lax; Secure',
-          },
+        const headers = new Headers({
+          location:
+            'https://github.com/login/oauth/authorize?client_id=ext&state=teststate&scope=repo&site=' +
+            (url.searchParams.get('site_id') ?? ''),
+          'set-cookie': 'csrf-token=github_00000000000000000000000000000000; HttpOnly; Path=/; Max-Age=600; SameSite=Lax; Secure',
         });
+
+        // Proxy-Header-Test R4: ein oeffentlicher Upstream-Cache-Control-Wert
+        // darf den erzwungenen 'no-store' niemals aufweichen.
+        if (url.searchParams.get('simulate_cache') === 'public') {
+          headers.set('cache-control', 'public, max-age=3600');
+        }
+
+        return new Response(null, { status: 302, headers });
       }
 
       if (url.pathname === '/callback') {
@@ -52,6 +63,12 @@ export default {
         // Browser zu setzen. Der Proxy MUSS das herausfiltern.
         if (url.searchParams.get('inject') === 'cf') {
           headers.append('set-cookie', 'CF_Authorization=upstream-injected; Path=/; Secure; HttpOnly');
+        }
+
+        // Proxy-Header-Test R4: ein oeffentlicher Upstream-Cache-Control-Wert
+        // darf den erzwungenen 'no-store' niemals aufweichen.
+        if (url.searchParams.get('simulate_cache') === 'public') {
+          headers.set('cache-control', 'public, max-age=3600');
         }
 
         return new Response(
