@@ -182,6 +182,22 @@ const ADMIN_STYLE = `
   .kv .v .editlink { margin-left: 6px; vertical-align: middle; }
   .badge { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 99px; padding: 2px 10px; }
   .badge.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+  .toggle-wrap { display: inline-flex; align-items: center; gap: 10px; }
+  .toggle-switch { position: relative; display: inline-flex; width: 46px; height: 26px; flex: none; }
+  .toggle-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+                         opacity: 0; cursor: pointer; z-index: 1; }
+  .toggle-track { position: absolute; inset: 0; border-radius: 999px; background: var(--danger);
+                  transition: background .15s ease; pointer-events: none; }
+  .toggle-track::before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; top: 3px;
+                          border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3);
+                          transition: transform .15s ease; }
+  .toggle-switch input:checked ~ .toggle-track { background: var(--ok); }
+  .toggle-switch input:checked ~ .toggle-track::before { transform: translateX(20px); }
+  .toggle-switch input:focus-visible ~ .toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toggle-switch input:disabled { cursor: default; }
+  .toggle-state { font-size: 13px; font-weight: 600; }
+  .toggle-state.on { color: var(--ok); }
+  .toggle-state.off { color: var(--danger); }
   .editlink { color: var(--text-2); display: inline-flex; padding: 2px; border-radius: 4px;
               border: 0; background: none; cursor: pointer; }
   .editlink:hover { color: var(--accent); }
@@ -993,11 +1009,14 @@ ${eventsTable}
     : `<span class="badge">${d.notConnectedBadge}</span>`;
 
   const loginDisabled = config.loginDisabled;
-  const loginBadge = loginDisabled
-    ? `<span class="badge btn-danger">${d.loginDisabledBadge}</span>`
-    : `<span class="badge ok">${d.loginActiveBadge}</span>`;
-  const loginToggleRow = `<span class="k">${d.loginToggleLabel}</span><span class="v">${loginBadge}
-<button class="btn ${loginDisabled ? '' : 'btn-danger'}" id="loginToggleBtn" data-disabled="${loginDisabled ? '1' : '0'}" style="margin-left:8px">${loginDisabled ? d.loginEnableButton : d.loginDisableButton}</button>
+  const loginToggleRow = `<span class="k">${d.loginToggleLabel}</span><span class="v">
+<span class="toggle-wrap">
+<label class="toggle-switch">
+<input type="checkbox" id="loginToggle" role="switch" ${loginDisabled ? '' : 'checked'} aria-label="${escapeHtmlAttribute(d.loginToggleLabel)}">
+<span class="toggle-track"></span>
+</label>
+<span class="toggle-state ${loginDisabled ? 'off' : 'on'}" id="loginToggleState">${loginDisabled ? d.loginDisabledBadge : d.loginActiveBadge}</span>
+</span>
 <span class="muted" style="display:block;margin-top:6px">${d.loginToggleHint}</span>
 </span>`;
 
@@ -1284,17 +1303,22 @@ ${settingsRow(
         .then(function () { location.reload(); });
     });
   }
-  var loginToggleBtn = document.getElementById('loginToggleBtn');
-  if (loginToggleBtn) {
-    loginToggleBtn.addEventListener('click', function () {
-      var currentlyDisabled = loginToggleBtn.getAttribute('data-disabled') === '1';
-      // Nur beim Deaktivieren rueckfragen; Wiederaktivieren ist unkritisch.
-      if (!currentlyDisabled && !window.confirm(${JSON.stringify(d.loginDisableConfirm)})) { return; }
-      loginToggleBtn.disabled = true;
+  var loginToggle = document.getElementById('loginToggle');
+  if (loginToggle) {
+    loginToggle.addEventListener('change', function () {
+      // Checked = Login aktiv. Abwaehlen (= deaktivieren) fragt zur Sicherheit
+      // nach; Wiederaktivieren ist unkritisch.
+      var willDisable = !loginToggle.checked;
+      if (willDisable && !window.confirm(${JSON.stringify(d.loginDisableConfirm)})) {
+        loginToggle.checked = true; // abgebrochen -> visuellen Zustand zuruecksetzen
+        return;
+      }
+      loginToggle.disabled = true;
       fetch('/setup/login', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ disabled: !currentlyDisabled }),
-      }).then(function (r) { return r.json(); }).then(function () { location.reload(); });
+        body: JSON.stringify({ disabled: willDisable }),
+      }).then(function (r) { return r.json(); }).then(function () { location.reload(); })
+        .catch(function () { loginToggle.disabled = false; });
     });
   }
   var reconnectBtn = document.getElementById('reconnectBtn');
