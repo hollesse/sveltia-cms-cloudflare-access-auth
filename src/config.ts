@@ -14,6 +14,8 @@ export type ConfigEnv = Omit<Env, 'TOKEN_STORE'>;
 export interface Anchors {
   accessTeamDomain: string;
   setupAdmins: string[];
+  /** Optional: erzwingt `/setup` sofort auf dieses `aud` (kein TOFU), wenn gesetzt. */
+  bootstrapAud?: string;
 }
 
 export interface MissingRequiredConfig {
@@ -71,6 +73,7 @@ export function resolveAnchors(env: ConfigEnv): AnchorsResult {
     ok: true,
     accessTeamDomain: env.ACCESS_TEAM_DOMAIN!,
     setupAdmins: parseList(env.SETUP_ADMINS),
+    bootstrapAud: firstNonBlank(env.SETUP_BOOTSTRAP_AUD),
   };
 }
 

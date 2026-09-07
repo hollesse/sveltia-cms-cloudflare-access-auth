@@ -209,7 +209,10 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     return renderMissingConfigPage(anchors, t);
   }
 
-  const tofu = await validateAccessJwt(request, anchors.accessTeamDomain, undefined);
+  // Ist der optionale Bootstrap-AUD gesetzt, wird er ab dem ersten Request
+  // erzwungen (kein TOFU-Fenster): ein JWT einer anderen App derselben
+  // Team-Domain wird abgewiesen. Nicht gesetzt -> TOFU (audience undefined).
+  const tofu = await validateAccessJwt(request, anchors.accessTeamDomain, anchors.bootstrapAud);
 
   if (!tofu.ok) {
     return new Response(t.setup.accessDenied, { status: 401 });
