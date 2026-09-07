@@ -155,8 +155,8 @@ export interface LoadedConfig {
   manageEditorsUrl: string | undefined;
   githubAuthUrlSkipped: boolean;
   manageEditorsUrlSkipped: boolean;
-  /** Notfall-Kill-Switch: Herausgabe von Bot-Tokens an `/auth/access` gesperrt. */
-  tokenIssuanceDisabled: boolean;
+  /** Redakteur-Login deaktiviert: `/auth/access` gibt keine Bot-Tokens mehr aus. */
+  loginDisabled: boolean;
   /** AUD + Client-ID gepinnt/bekannt UND mind. eine erlaubte Domain (Wizard-Schritte 1-3). */
   setupComplete: boolean;
 }
@@ -195,7 +195,7 @@ export function buildLoadedConfig(
     manageEditorsUrl,
     githubAuthUrlSkipped: settings.githubAuthUrlSkipped === true,
     manageEditorsUrlSkipped: settings.manageEditorsUrlSkipped === true,
-    tokenIssuanceDisabled: settings.tokenIssuanceDisabled === true,
+    loginDisabled: settings.loginDisabled === true,
     setupComplete:
       accessAppAud !== undefined && githubAppClientId !== undefined && allowedDomains.length > 0,
   };

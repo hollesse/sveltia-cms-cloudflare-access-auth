@@ -54,12 +54,13 @@ export interface StoredSettings {
   githubAuthUrlDisabled?: boolean;
   manageEditorsUrlDisabled?: boolean;
   /**
-   * Notfall-Kill-Switch: solange gesetzt, gibt `/auth/access` KEIN Bot-Token
-   * mehr aus — auch bei gueltigem Access-JWT und noch laufender Session. Der
-   * interne Cron-Refresh laeuft unberuehrt weiter; gesperrt ist nur die
+   * Redakteur-Login deaktiviert: solange gesetzt, gibt `/auth/access` KEIN
+   * Bot-Token mehr aus — auch bei gueltigem Access-JWT und noch laufender
+   * Session. Nutzbar als geplanter Wartungsschalter oder als Sofort-Notbremse.
+   * Der interne Cron-Refresh laeuft unberuehrt weiter; deaktiviert ist nur die
    * Herausgabe an Browser.
    */
-  tokenIssuanceDisabled?: boolean;
+  loginDisabled?: boolean;
 }
 
 const SETTINGS_KEY = 'settings:v1';

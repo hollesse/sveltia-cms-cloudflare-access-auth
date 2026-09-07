@@ -45,12 +45,12 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
     return renderAccessUnauthorizedPage(t);
   }
 
-  // Notfall-Kill-Switch: ist die Token-Ausgabe gesperrt, wird selbst mit
-  // gueltigem Access-JWT kein Token herausgegeben (kein Tokenwert im Body) —
-  // sofort wirksam, ohne auf Session- oder Token-Ablauf zu warten.
-  if (config.tokenIssuanceDisabled) {
+  // Redakteur-Login deaktiviert (Wartung/Notfall): selbst mit gueltigem
+  // Access-JWT wird kein Token herausgegeben (kein Tokenwert im Body) — sofort
+  // wirksam, ohne auf Session- oder Token-Ablauf zu warten.
+  if (config.loginDisabled) {
     return renderCallbackErrorPage(
-      t.callbackError.issuanceDisabled,
+      t.callbackError.loginDisabled,
       config.allowedDomains,
       t,
       503,

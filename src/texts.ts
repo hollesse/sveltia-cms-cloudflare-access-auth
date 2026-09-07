@@ -22,7 +22,7 @@ export interface Texts {
     notConnected: string;
     githubFailed: string;
     setupIncomplete: string;
-    issuanceDisabled: string;
+    loginDisabled: string;
   };
   setup: {
     title: string;
@@ -143,11 +143,13 @@ export interface Texts {
     reconnectButton: string;
     disconnectButton: string;
     disconnectHint: string;
-    killSwitchLockButton: string;
-    killSwitchUnlockButton: string;
-    killSwitchHint: string;
-    killSwitchLockedBadge: string;
-    killSwitchLockConfirm: string;
+    loginToggleLabel: string;
+    loginActiveBadge: string;
+    loginDisabledBadge: string;
+    loginEnableButton: string;
+    loginDisableButton: string;
+    loginToggleHint: string;
+    loginDisableConfirm: string;
     collapseLabel: string;
     toggleMenuTitle: string;
     navAudit: string;
@@ -163,8 +165,8 @@ export interface Texts {
     eventBotDisconnected: string;
     eventTokenRotated: string;
     eventTokenRotateFailed: string;
-    eventIssuanceLocked: string;
-    eventIssuanceUnlocked: string;
+    eventLoginDisabled: string;
+    eventLoginEnabled: string;
   };
 }
 
@@ -209,8 +211,8 @@ const de: Texts = {
       'Die Anmeldung bei GitHub ist fehlgeschlagen. Bitte in ein paar Minuten erneut versuchen; bleibt der Fehler, den Betreiber informieren.',
     setupIncomplete:
       'Die Einrichtung ist noch nicht abgeschlossen (fehlendes AUD oder fehlende GitHub-App-Client-ID). Bitte den Betreiber informieren (Einrichtung unter /setup).',
-    issuanceDisabled:
-      'Die Token-Ausgabe ist derzeit vom Betreiber gesperrt. Bitte spaeter erneut versuchen oder den Betreiber informieren.',
+    loginDisabled:
+      'Die Anmeldung ist derzeit vom Betreiber deaktiviert. Bitte spaeter erneut versuchen oder den Betreiber informieren.',
   },
   setup: {
     title: 'GitHub-Verbindung einrichten',
@@ -377,11 +379,13 @@ const de: Texts = {
     reconnectButton: 'Neu verbinden',
     disconnectButton: 'Verbindung trennen',
     disconnectHint: 'Löscht das gespeicherte Token-Paar; der Wizard fragt die Verbindung danach neu ab. Vollständiger Widerruf: GitHub-Einstellungen des Bot-Accounts.',
-    killSwitchLockButton: 'Token-Ausgabe sperren',
-    killSwitchUnlockButton: 'Token-Ausgabe freigeben',
-    killSwitchHint: 'Notfall: sperrt sofort jede Token-Herausgabe an Browser — auch für laufende Sessions. Der interne Refresh läuft weiter; nach dem Freigeben ist alles wieder normal.',
-    killSwitchLockedBadge: 'Ausgabe gesperrt',
-    killSwitchLockConfirm: 'Token-Ausgabe wirklich sperren? Danach bekommt niemand mehr ein Token, bis du wieder freigibst.',
+    loginToggleLabel: 'Redakteur-Login',
+    loginActiveBadge: 'Aktiv',
+    loginDisabledBadge: 'Deaktiviert',
+    loginEnableButton: 'Login aktivieren',
+    loginDisableButton: 'Login deaktivieren',
+    loginToggleHint: 'Steuert die Anmeldung der Redakteure. Deaktivieren wirkt sofort — auch für bereits offene Sessions bekommt niemand mehr ein Token (für Wartungsfenster oder als Notbremse). Der interne Token-Refresh läuft weiter; Aktivieren stellt den Normalbetrieb sofort wieder her.',
+    loginDisableConfirm: 'Redakteur-Login wirklich deaktivieren? Danach kann sich niemand mehr anmelden, bis du ihn wieder aktivierst.',
     collapseLabel: 'Einklappen',
     toggleMenuTitle: 'Menü ein-/ausklappen',
     navAudit: 'Audit-Log',
@@ -398,8 +402,8 @@ const de: Texts = {
     eventBotDisconnected: 'Verbindung getrennt',
     eventTokenRotated: 'Token rotiert',
     eventTokenRotateFailed: 'Token-Rotation fehlgeschlagen',
-    eventIssuanceLocked: 'Token-Ausgabe gesperrt',
-    eventIssuanceUnlocked: 'Token-Ausgabe freigegeben',
+    eventLoginDisabled: 'Login deaktiviert',
+    eventLoginEnabled: 'Login aktiviert',
   },
 };
 
@@ -443,8 +447,8 @@ const en: Texts = {
       'Signing in to GitHub failed. Please try again in a few minutes; if the error persists, contact the operator.',
     setupIncomplete:
       'Setup is not complete yet (missing AUD or missing GitHub App client ID). Please contact the operator (setup at /setup).',
-    issuanceDisabled:
-      'Token issuance is currently locked by the operator. Please try again later or contact the operator.',
+    loginDisabled:
+      'Sign-in is currently disabled by the operator. Please try again later or contact the operator.',
   },
   setup: {
     title: 'Set up the GitHub connection',
@@ -608,11 +612,13 @@ const en: Texts = {
     reconnectButton: 'Reconnect',
     disconnectButton: 'Disconnect',
     disconnectHint: 'Deletes the stored token pair; the wizard will ask to connect again. Full revocation: the bot account\'s GitHub settings.',
-    killSwitchLockButton: 'Lock token issuance',
-    killSwitchUnlockButton: 'Unlock token issuance',
-    killSwitchHint: 'Emergency: immediately stops handing out any token to browsers — including for live sessions. The internal refresh keeps running; unlocking restores normal operation.',
-    killSwitchLockedBadge: 'Issuance locked',
-    killSwitchLockConfirm: 'Really lock token issuance? Nobody will receive a token until you unlock it again.',
+    loginToggleLabel: 'Editor sign-in',
+    loginActiveBadge: 'Enabled',
+    loginDisabledBadge: 'Disabled',
+    loginEnableButton: 'Enable sign-in',
+    loginDisableButton: 'Disable sign-in',
+    loginToggleHint: 'Controls whether editors can sign in. Disabling takes effect immediately — even live sessions stop receiving tokens (for maintenance windows or as an emergency brake). The internal token refresh keeps running; enabling restores normal operation right away.',
+    loginDisableConfirm: 'Really disable editor sign-in? Nobody will be able to sign in until you enable it again.',
     collapseLabel: 'Collapse',
     toggleMenuTitle: 'Collapse/expand menu',
     navAudit: 'Audit log',
@@ -629,8 +635,8 @@ const en: Texts = {
     eventBotDisconnected: 'Disconnected',
     eventTokenRotated: 'Token rotated',
     eventTokenRotateFailed: 'Token rotation failed',
-    eventIssuanceLocked: 'Token issuance locked',
-    eventIssuanceUnlocked: 'Token issuance unlocked',
+    eventLoginDisabled: 'Sign-in disabled',
+    eventLoginEnabled: 'Sign-in enabled',
   },
 };
 
