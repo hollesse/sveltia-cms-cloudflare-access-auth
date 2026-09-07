@@ -125,6 +125,8 @@ export interface Texts {
     statusLabel: string;
     connectedBadge: string;
     notConnectedBadge: string;
+    accountLabel: string;
+    installationsLabel: (count: number) => string;
     tokenLabel: string;
     tokenShow: string;
     tokenHide: string;
@@ -348,6 +350,8 @@ const de: Texts = {
     statusLabel: 'Status',
     connectedBadge: 'Verbunden',
     notConnectedBadge: 'Nicht verbunden',
+    accountLabel: 'Verbundenes Konto',
+    installationsLabel: (count) => `${count} erreichbare Installation${count === 1 ? '' : 'en'}`,
     tokenLabel: 'Aktuelles Token',
     tokenShow: 'Token anzeigen',
     tokenHide: 'Token verbergen',
@@ -568,6 +572,8 @@ const en: Texts = {
     statusLabel: 'Status',
     connectedBadge: 'Connected',
     notConnectedBadge: 'Not connected',
+    accountLabel: 'Connected account',
+    installationsLabel: (count) => `${count} reachable installation${count === 1 ? '' : 's'}`,
     tokenLabel: 'Current token',
     tokenShow: 'Show token',
     tokenHide: 'Hide token',

@@ -10,6 +10,8 @@
 
 const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const GITHUB_OAUTH_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const GITHUB_API_USER_URL = 'https://api.github.com/user';
+const GITHUB_API_INSTALLATIONS_URL = 'https://api.github.com/user/installations';
 
 export interface TokenPair {
   accessToken: string;
@@ -158,6 +160,69 @@ export async function pollDeviceFlow(
   }
 
   return { ok: true, pair };
+}
+
+export interface AuthorizationInfo {
+  ok: true;
+  /** GitHub-Login des autorisierten Kontos (der Bot). */
+  login: string;
+  accountId: number;
+  /** Anzahl der App-Installationen, die dieses Token erreicht. */
+  installations: number;
+}
+
+function apiHeaders(accessToken: string): Record<string, string> {
+  return {
+    accept: 'application/vnd.github+json',
+    authorization: `Bearer ${accessToken}`,
+    'user-agent': 'sveltia-cms-cloudflare-access-auth',
+    'x-github-api-version': '2022-11-28',
+  };
+}
+
+/**
+ * Verifiziert direkt nach dem Device Flow, WELCHES GitHub-Konto autorisiert hat
+ * (`GET /user`) und wie viele App-Installationen das Token erreicht
+ * (`GET /user/installations`) — auth-v8n3c. Die Identitaet ist das Gate: ein
+ * ungueltiges Token / fehlgeschlagenes `GET /user` liefert `ok: false`, sodass
+ * der Aufrufer NICHT speichert (statt still eine kaputte/falsche Verbindung
+ * abzulegen). Die Installations-Zahl ist best effort (informativ).
+ */
+export async function verifyAuthorization(
+  accessToken: string,
+): Promise<AuthorizationInfo | GithubFlowError> {
+  let userResponse: Response;
+
+  try {
+    userResponse = await fetch(GITHUB_API_USER_URL, { headers: apiHeaders(accessToken) });
+  } catch {
+    return { ok: false, reason: 'github_unreachable' };
+  }
+
+  if (!userResponse.ok) {
+    return { ok: false, reason: `github_user_${userResponse.status}` };
+  }
+
+  const user = (await userResponse.json()) as { login?: string; id?: number };
+
+  if (!user.login || typeof user.id !== 'number') {
+    return { ok: false, reason: 'github_malformed_response' };
+  }
+
+  let installations = 0;
+
+  try {
+    const response = await fetch(GITHUB_API_INSTALLATIONS_URL, { headers: apiHeaders(accessToken) });
+
+    if (response.ok) {
+      const data = (await response.json()) as { total_count?: number };
+      installations = typeof data.total_count === 'number' ? data.total_count : 0;
+    }
+  } catch {
+    installations = 0;
+  }
+
+  return { ok: true, login: user.login, accountId: user.id, installations };
 }
 
 export type RefreshResult = { ok: true; pair: TokenPair } | GithubFlowError;

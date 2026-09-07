@@ -67,6 +67,25 @@ export default {
       return new Response('ext not found', { status: 404 });
     }
 
+    // GitHub API — Konto-Verifikation nach dem Device Flow (auth-v8n3c).
+    if (url.hostname === 'api.github.com') {
+      const auth = request.headers.get('authorization') ?? '';
+
+      if (url.pathname === '/user') {
+        if (auth.includes('ghu_bad')) {
+          return new Response('bad credentials', { status: 401 });
+        }
+
+        return json({ login: 'myclub-cms-bot', id: 4242 });
+      }
+
+      if (url.pathname === '/user/installations') {
+        return json({ total_count: 1, installations: [{ id: 1 }] });
+      }
+
+      return new Response('gh api not found', { status: 404 });
+    }
+
     if (url.pathname === '/login/device/code') {
       const body = await request.json();
 
@@ -103,6 +122,15 @@ export default {
         if (body.device_code === 'device-ok') {
           return json({
             access_token: 'ghu_device_token',
+            expires_in: 28800,
+            refresh_token: 'refresh-ok',
+            token_type: 'bearer',
+          });
+        }
+
+        if (body.device_code === 'device-badaccount') {
+          return json({
+            access_token: 'ghu_bad',
             expires_in: 28800,
             refresh_token: 'refresh-ok',
             token_type: 'bearer',

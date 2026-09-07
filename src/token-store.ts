@@ -14,11 +14,19 @@ export type GetTokenResult =
   | { ok: true; token: string }
   | { ok: false; reason: 'not_authorized' | 'refresh_failed' };
 
+/** Verifiziertes GitHub-Konto der aktuellen Autorisierung (auth-v8n3c). */
+export interface AccountInfo {
+  login: string;
+  installations: number;
+}
+
 export interface TokenStoreStatus {
   authorized: boolean;
   expiresAt: number | null;
   /** Aktuell gespeichertes Access-Token (nur Anzeige; loest KEINEN Refresh aus). */
   accessToken: string | null;
+  /** Verifiziertes GitHub-Konto (Login + erreichbare Installationen) oder null. */
+  account: AccountInfo | null;
 }
 
 /**
@@ -49,6 +57,7 @@ export interface StoredSettings {
 
 const SETTINGS_KEY = 'settings:v1';
 const USERS_KEY = 'users:v1';
+const ACCOUNT_KEY = 'account:v1';
 
 /** Login-Historie eines Redakteurs (Betriebs-/Audit-Log, ADR 0015). */
 export interface UserRecord {
@@ -94,6 +103,11 @@ export class TokenStore extends DurableObject<Env> {
       refreshToken: pair.refreshToken,
     });
     await this.bumpGeneration();
+  }
+
+  /** Speichert das verifizierte GitHub-Konto der aktuellen Autorisierung (auth-v8n3c). */
+  async storeAccount(account: AccountInfo): Promise<void> {
+    await this.ctx.storage.put(ACCOUNT_KEY, account);
   }
 
   /**
@@ -160,22 +174,24 @@ export class TokenStore extends DurableObject<Env> {
    * GitHub-Einstellungen des Bot-Accounts (Applications -> Authorized).
    */
   async clearAuthorization(): Promise<void> {
-    await this.ctx.storage.delete(['accessToken', 'expiresAt', 'refreshToken']);
+    await this.ctx.storage.delete(['accessToken', 'expiresAt', 'refreshToken', ACCOUNT_KEY]);
     await this.bumpGeneration();
   }
 
   /** Fuer die Setup-Seite: ist der Tresor befuellt, bis wann gilt das Token? */
   async status(): Promise<TokenStoreStatus> {
-    const [refreshToken, expiresAt, accessToken] = await Promise.all([
+    const [refreshToken, expiresAt, accessToken, account] = await Promise.all([
       this.ctx.storage.get<string>('refreshToken'),
       this.ctx.storage.get<number>('expiresAt'),
       this.ctx.storage.get<string>('accessToken'),
+      this.ctx.storage.get<AccountInfo>(ACCOUNT_KEY),
     ]);
 
     return {
       authorized: refreshToken !== undefined,
       expiresAt: expiresAt ?? null,
       accessToken: accessToken ?? null,
+      account: account ?? null,
     };
   }
 
