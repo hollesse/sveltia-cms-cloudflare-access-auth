@@ -57,6 +57,23 @@ export interface UserRecord {
   lastSeen: number;
 }
 
+const EVENTS_KEY = 'events:v1';
+/** Cap: nur die neuesten N Sicherheitsereignisse werden vorgehalten (auth-n4v6c). */
+const MAX_EVENTS = 200;
+
+/**
+ * Unveraenderliches Sicherheitsereignis (auth-n4v6c): wer (`actor`) wann (`at`)
+ * was (`type`) getan hat, mit optionalem `detail`. Bewusst OHNE Tokenwerte /
+ * Secrets. Append-only, gedeckelt, nicht per UI loeschbar — anders als die
+ * Login-Historie.
+ */
+export interface AuditEvent {
+  type: string;
+  actor: string;
+  at: number;
+  detail?: string;
+}
+
 /**
  * Der Token-Tresor (ADR 0011): haelt genau EIN GitHub-App-User-Token-Paar
  * des Bot-Accounts. Ein Durable Object statt KV, weil (a) sein Binding rein
@@ -113,6 +130,28 @@ export class TokenStore extends DurableObject<Env> {
     const users = (await this.ctx.storage.get<Record<string, UserRecord>>(USERS_KEY)) ?? {};
     delete users[email.trim().toLowerCase()];
     await this.ctx.storage.put(USERS_KEY, users);
+  }
+
+  /**
+   * Haengt ein Sicherheitsereignis an (append-only, Cap MAX_EVENTS): nur
+   * `type`/`actor`/`detail`/`at` — nie Tokenwerte. Kein Loesch-Pendant (auth-n4v6c).
+   */
+  async recordEvent(event: { type: string; actor: string; detail?: string }, now: number): Promise<void> {
+    const events = (await this.ctx.storage.get<AuditEvent[]>(EVENTS_KEY)) ?? [];
+    events.push({
+      type: event.type,
+      actor: event.actor,
+      at: now,
+      ...(event.detail !== undefined ? { detail: event.detail } : {}),
+    });
+    const capped = events.length > MAX_EVENTS ? events.slice(events.length - MAX_EVENTS) : events;
+    await this.ctx.storage.put(EVENTS_KEY, capped);
+  }
+
+  /** Sicherheitsereignisse, neueste zuerst. */
+  async listEvents(): Promise<AuditEvent[]> {
+    const events = (await this.ctx.storage.get<AuditEvent[]>(EVENTS_KEY)) ?? [];
+    return [...events].reverse();
   }
 
   /**
