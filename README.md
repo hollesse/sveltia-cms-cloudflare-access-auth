@@ -296,7 +296,16 @@ save error, reload, sign in again (a two-second popup), and their draft is
 still there — see [docs/redakteure.md](docs/redakteure.md).
 
 **If you suspect a token leaked.** Click *Rotate token now* in the dashboard —
-every token currently out there stops working immediately.
+every token currently out there stops working immediately. Note that a still-valid
+Cloudflare Access session can then fetch a fresh token right away; rotation
+invalidates the *leaked* token, it is not a global logout.
+
+**If you need to stop all issuance right now.** Click *Lock token issuance* in the
+dashboard's GitHub section. While locked, `/auth/access` hands out no token at all —
+even to a valid, still-open Access session — until you unlock it again. Use this as
+the immediate emergency brake when rotating alone isn't enough (e.g. an Access
+session you can't yet revoke); the internal cron refresh keeps the vault current in
+the meantime, so unlocking restores normal operation instantly.
 
 **If sign-in suddenly fails for everyone.** GitHub may have revoked the bot's
 authorization (e.g. the bot account changed its password). The login shows a

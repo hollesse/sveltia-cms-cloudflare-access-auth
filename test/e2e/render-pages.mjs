@@ -41,6 +41,7 @@ export async function renderAllPages() {
     manageEditorsUrl: 'https://dash.example.com/policy',
     githubAuthUrlSkipped: false,
     manageEditorsUrlSkipped: false,
+    tokenIssuanceDisabled: false,
     setupComplete: true,
   };
   const status = {

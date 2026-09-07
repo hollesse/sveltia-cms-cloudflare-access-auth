@@ -17,7 +17,13 @@ export interface Texts {
   unsupportedDomain: { title: string; text: string; detailLabel: string };
   accessUnauthorized: { title: string; text: string };
   callbackSuccess: { title: string; text: string };
-  callbackError: { title: string; notConnected: string; githubFailed: string; setupIncomplete: string };
+  callbackError: {
+    title: string;
+    notConnected: string;
+    githubFailed: string;
+    setupIncomplete: string;
+    issuanceDisabled: string;
+  };
   setup: {
     title: string;
     statusConnected: (expiresIso: string) => string;
@@ -137,6 +143,11 @@ export interface Texts {
     reconnectButton: string;
     disconnectButton: string;
     disconnectHint: string;
+    killSwitchLockButton: string;
+    killSwitchUnlockButton: string;
+    killSwitchHint: string;
+    killSwitchLockedBadge: string;
+    killSwitchLockConfirm: string;
     collapseLabel: string;
     toggleMenuTitle: string;
     navAudit: string;
@@ -152,6 +163,8 @@ export interface Texts {
     eventBotDisconnected: string;
     eventTokenRotated: string;
     eventTokenRotateFailed: string;
+    eventIssuanceLocked: string;
+    eventIssuanceUnlocked: string;
   };
 }
 
@@ -196,6 +209,8 @@ const de: Texts = {
       'Die Anmeldung bei GitHub ist fehlgeschlagen. Bitte in ein paar Minuten erneut versuchen; bleibt der Fehler, den Betreiber informieren.',
     setupIncomplete:
       'Die Einrichtung ist noch nicht abgeschlossen (fehlendes AUD oder fehlende GitHub-App-Client-ID). Bitte den Betreiber informieren (Einrichtung unter /setup).',
+    issuanceDisabled:
+      'Die Token-Ausgabe ist derzeit vom Betreiber gesperrt. Bitte spaeter erneut versuchen oder den Betreiber informieren.',
   },
   setup: {
     title: 'GitHub-Verbindung einrichten',
@@ -362,6 +377,11 @@ const de: Texts = {
     reconnectButton: 'Neu verbinden',
     disconnectButton: 'Verbindung trennen',
     disconnectHint: 'Löscht das gespeicherte Token-Paar; der Wizard fragt die Verbindung danach neu ab. Vollständiger Widerruf: GitHub-Einstellungen des Bot-Accounts.',
+    killSwitchLockButton: 'Token-Ausgabe sperren',
+    killSwitchUnlockButton: 'Token-Ausgabe freigeben',
+    killSwitchHint: 'Notfall: sperrt sofort jede Token-Herausgabe an Browser — auch für laufende Sessions. Der interne Refresh läuft weiter; nach dem Freigeben ist alles wieder normal.',
+    killSwitchLockedBadge: 'Ausgabe gesperrt',
+    killSwitchLockConfirm: 'Token-Ausgabe wirklich sperren? Danach bekommt niemand mehr ein Token, bis du wieder freigibst.',
     collapseLabel: 'Einklappen',
     toggleMenuTitle: 'Menü ein-/ausklappen',
     navAudit: 'Audit-Log',
@@ -378,6 +398,8 @@ const de: Texts = {
     eventBotDisconnected: 'Verbindung getrennt',
     eventTokenRotated: 'Token rotiert',
     eventTokenRotateFailed: 'Token-Rotation fehlgeschlagen',
+    eventIssuanceLocked: 'Token-Ausgabe gesperrt',
+    eventIssuanceUnlocked: 'Token-Ausgabe freigegeben',
   },
 };
 
@@ -421,6 +443,8 @@ const en: Texts = {
       'Signing in to GitHub failed. Please try again in a few minutes; if the error persists, contact the operator.',
     setupIncomplete:
       'Setup is not complete yet (missing AUD or missing GitHub App client ID). Please contact the operator (setup at /setup).',
+    issuanceDisabled:
+      'Token issuance is currently locked by the operator. Please try again later or contact the operator.',
   },
   setup: {
     title: 'Set up the GitHub connection',
@@ -584,6 +608,11 @@ const en: Texts = {
     reconnectButton: 'Reconnect',
     disconnectButton: 'Disconnect',
     disconnectHint: 'Deletes the stored token pair; the wizard will ask to connect again. Full revocation: the bot account\'s GitHub settings.',
+    killSwitchLockButton: 'Lock token issuance',
+    killSwitchUnlockButton: 'Unlock token issuance',
+    killSwitchHint: 'Emergency: immediately stops handing out any token to browsers — including for live sessions. The internal refresh keeps running; unlocking restores normal operation.',
+    killSwitchLockedBadge: 'Issuance locked',
+    killSwitchLockConfirm: 'Really lock token issuance? Nobody will receive a token until you unlock it again.',
     collapseLabel: 'Collapse',
     toggleMenuTitle: 'Collapse/expand menu',
     navAudit: 'Audit log',
@@ -600,6 +629,8 @@ const en: Texts = {
     eventBotDisconnected: 'Disconnected',
     eventTokenRotated: 'Token rotated',
     eventTokenRotateFailed: 'Token rotation failed',
+    eventIssuanceLocked: 'Token issuance locked',
+    eventIssuanceUnlocked: 'Token issuance unlocked',
   },
 };
 

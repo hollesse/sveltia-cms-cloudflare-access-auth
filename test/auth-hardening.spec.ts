@@ -73,6 +73,7 @@ describe('Wizard final step renders valid script markup', () => {
     manageEditorsUrl: undefined,
     githubAuthUrlSkipped: true,
     manageEditorsUrlSkipped: true,
+    tokenIssuanceDisabled: false,
     setupComplete: true,
   };
 

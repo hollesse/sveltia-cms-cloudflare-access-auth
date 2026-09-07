@@ -35,6 +35,7 @@ const JSON_POST_PATHS = new Set([
   '/setup/settings',
   '/setup/github/poll',
   '/setup/users/delete',
+  '/setup/issuance',
 ]);
 
 /**
@@ -317,6 +318,22 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     const started = await startDeviceFlow(clientId);
 
     return Response.json(started, { status: started.ok ? 200 : 502 });
+  }
+
+  if (url.pathname === '/setup/issuance' && request.method === 'POST') {
+    const body = (await request.json().catch(() => null)) as { disabled?: boolean } | null;
+
+    if (!body || typeof body.disabled !== 'boolean') {
+      return Response.json({ ok: false, reason: 'invalid_body' }, { status: 400 });
+    }
+
+    await tokenStore.updateSettings({ tokenIssuanceDisabled: body.disabled });
+    await tokenStore.recordEvent(
+      { type: body.disabled ? 'issuance_locked' : 'issuance_unlocked', actor: email },
+      Date.now(),
+    );
+
+    return Response.json({ ok: true, disabled: body.disabled });
   }
 
   if (url.pathname === '/setup/github/disconnect' && request.method === 'POST') {

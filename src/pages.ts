@@ -482,6 +482,7 @@ export function renderCallbackErrorPage(
   message: string,
   allowedDomains: string[],
   t: Texts,
+  status = 502,
 ): Response {
   const script = `(function () {
   var provider = 'github';
@@ -512,7 +513,7 @@ export function renderCallbackErrorPage(
 </div>
 <script>${script}</script>`;
 
-  return htmlResponse(page(t.lang, t.callbackError.title, body), 502);
+  return htmlResponse(page(t.lang, t.callbackError.title, body), status);
 }
 
 /** Fehlerseite: AUD/Client-ID (noch) unbekannt — Verweis auf `/setup` statt
@@ -940,6 +941,8 @@ ${userTable}
     bot_disconnected: d.eventBotDisconnected,
     token_rotated: d.eventTokenRotated,
     token_rotate_failed: d.eventTokenRotateFailed,
+    issuance_locked: d.eventIssuanceLocked,
+    issuance_unlocked: d.eventIssuanceUnlocked,
   };
 
   const eventRows = events
@@ -972,6 +975,11 @@ ${eventsTable}
   const badge = status.authorized
     ? `<span class="badge ok">${d.connectedBadge}</span>`
     : `<span class="badge">${d.notConnectedBadge}</span>`;
+
+  const issuanceLocked = config.tokenIssuanceDisabled;
+  const lockBadge = issuanceLocked
+    ? ` <span class="badge btn-danger">${d.killSwitchLockedBadge}</span>`
+    : '';
 
   // Naechste Cron-Rotation (0/6/12/18 UTC) serverseitig als ISO bestimmen;
   // die Umrechnung in die Nutzer-Zeitzone macht der Client (localizeTimes()).
@@ -1006,7 +1014,7 @@ ${eventsTable}
   const githubSection = `<div class="card full">
 <h2>${d.githubTitle}</h2>
 <div class="kv">
-<span class="k">${d.statusLabel}</span><span>${badge}</span>
+<span class="k">${d.statusLabel}</span><span>${badge}${lockBadge}</span>
 ${accountRow}
 ${tokenRow}
 ${settingsRow(
@@ -1024,6 +1032,10 @@ ${settingsRow(
 <button class="btn btn-danger" id="disconnectBtn" title="${escapeHtmlAttribute(d.disconnectHint)}">${d.disconnectButton}</button>
 </div>
 <p id="rotateStatus" class="muted"></p>
+<div class="row">
+<button class="btn btn-danger" id="issuanceBtn" data-locked="${issuanceLocked ? '1' : '0'}" title="${escapeHtmlAttribute(d.killSwitchHint)}">${issuanceLocked ? d.killSwitchUnlockButton : d.killSwitchLockButton}</button>
+</div>
+<p class="muted" style="margin-top:8px">${d.killSwitchHint}</p>
 <div id="flow" hidden>
   <p>${t.setup.flowStep1} <strong id="code" style="font-size:1.5em"></strong></p>
   <p>2. <a id="verify" target="_blank" rel="noopener">github.com/login/device</a>
@@ -1225,6 +1237,18 @@ ${settingsRow(
       fetch('/setup/github/disconnect', { method: 'POST' })
         .then(function (r) { return r.json(); })
         .then(function () { location.reload(); });
+    });
+  }
+  var issuanceBtn = document.getElementById('issuanceBtn');
+  if (issuanceBtn) {
+    issuanceBtn.addEventListener('click', function () {
+      var locked = issuanceBtn.getAttribute('data-locked') === '1';
+      if (!locked && !window.confirm(${JSON.stringify(d.killSwitchLockConfirm)})) { return; }
+      issuanceBtn.disabled = true;
+      fetch('/setup/issuance', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ disabled: !locked }),
+      }).then(function (r) { return r.json(); }).then(function () { location.reload(); });
     });
   }
   var reconnectBtn = document.getElementById('reconnectBtn');
