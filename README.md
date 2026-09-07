@@ -100,6 +100,14 @@ Access *team* — not only this app. If your Access team also hosts other, less
 restrictive apps, finish the wizard's first step (pin the AUD) before relying on
 it; once pinned, only this app's sessions are accepted everywhere.
 
+To close that first-use window entirely, set the optional secret
+`SETUP_BOOTSTRAP_AUD` to this app's AUD before the first sign-in
+(`wrangler secret put SETUP_BOOTSTRAP_AUD`). When set, `/setup` enforces exactly
+that audience from the very first request — a JWT from another app of the same
+team is rejected — so there is no trust-on-first-use step to get right. Leave it
+unset for the default behaviour above. Single-app deployments (the common case)
+don't need it; it matters only when you share a team domain with weaker apps.
+
 **The personal-GitHub alternative.** If you enable the optional GitHub sign-in
 path (delegated to `sveltia-cms-auth`, see below), editors using it sign in with
 their own GitHub account: commits are attributed to them personally, but that

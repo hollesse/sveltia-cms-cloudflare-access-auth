@@ -13,6 +13,13 @@ export interface Env {
   GITHUB_APP_CLIENT_ID?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_APP_AUD?: string;
+  /**
+   * Optionaler Bootstrap-Anker (Secret): ist er gesetzt, erzwingt `/setup` von
+   * Anfang an genau dieses `aud` — kein TOFU-Fenster. Nicht gesetzt = heutiges
+   * TOFU-Verhalten (jede Setup-Admin-Session der Team-Domain, bis ein AUD
+   * gepinnt ist). Sinnvoll bei geteilter Team-Domain mit mehreren Access-Apps.
+   */
+  SETUP_BOOTSTRAP_AUD?: string;
   ALLOWED_DOMAINS?: string;
   GITHUB_AUTH_URL?: string;
   /**
