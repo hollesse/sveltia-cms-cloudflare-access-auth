@@ -91,4 +91,36 @@ test.describe('interactive client behaviour', () => {
     expect(dialogShown).toBe(true);
     await expect(toggle).toBeChecked();
   });
+
+  test('disabling updates the state in place without a hard reload', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    // Specific route for the toggle POST, registered after serve() so it wins.
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, disabled: true }) }),
+    );
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const state = page.locator('#loginToggleState');
+    await expect(state).toHaveText('Enabled');
+
+    await page.locator('label.toggle-switch').click();
+
+    // No reload: still on the Settings section, state flipped in place.
+    await expect(page.locator('.section[data-section="settings"]')).toHaveClass(/active/);
+    await expect(state).toHaveText('Disabled');
+    await expect(page.locator('#loginToggle')).not.toBeChecked();
+  });
+
+  test('the login hint is a tooltip that appears on hover', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.locator('.navbtn[data-section="settings"]').click();
+
+    const bubble = page.locator('.infotip-bubble').first();
+    await expect(bubble).toBeHidden();
+    await page.locator('.infotip').first().hover();
+    await expect(bubble).toBeVisible();
+  });
 });
