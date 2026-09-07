@@ -5,7 +5,7 @@ import {
   parseAndValidateDomains,
   resolveAnchors,
 } from '../config.js';
-import { pollDeviceFlow, startDeviceFlow } from '../github.js';
+import { pollDeviceFlow, startDeviceFlow, verifyAuthorization } from '../github.js';
 import {
   renderDashboardPage,
   renderMissingConfigPage,
@@ -378,8 +378,17 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
     const polled = await pollDeviceFlow(clientId, body.deviceCode);
 
     if (polled.ok) {
+      // Vor dem Speichern verifizieren, WELCHES Konto autorisiert hat (auth-v8n3c):
+      // ein ungueltiges Token wird nicht abgelegt (keine stille Fehlverbindung).
+      const verified = await verifyAuthorization(polled.pair.accessToken);
+
+      if (!verified.ok) {
+        return Response.json({ ok: false, reason: verified.reason }, { status: 502 });
+      }
+
       await tokenStore.storeAuthorization(polled.pair);
-      await tokenStore.recordEvent({ type: 'bot_connected', actor: email }, Date.now());
+      await tokenStore.storeAccount({ login: verified.login, installations: verified.installations });
+      await tokenStore.recordEvent({ type: 'bot_connected', actor: email, detail: verified.login }, Date.now());
 
       return Response.json({ ok: true });
     }

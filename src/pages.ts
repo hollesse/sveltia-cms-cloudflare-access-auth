@@ -999,10 +999,15 @@ ${eventsTable}
 <span class="k">${d.nextRotationLabel}</span><span class="v"><span class="localtime" data-iso="${nextRotationIso}">—</span></span>`
     : '';
 
+  const accountRow = status.account
+    ? `<span class="k">${d.accountLabel}</span><span class="v"><code>${escapeHtml(status.account.login)}</code> <span class="muted">· ${escapeHtml(d.installationsLabel(status.account.installations))}</span></span>`
+    : '';
+
   const githubSection = `<div class="card full">
 <h2>${d.githubTitle}</h2>
 <div class="kv">
 <span class="k">${d.statusLabel}</span><span>${badge}</span>
+${accountRow}
 ${tokenRow}
 ${settingsRow(
   d.fieldGithubAppClientId,

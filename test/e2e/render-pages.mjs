@@ -43,7 +43,12 @@ export async function renderAllPages() {
     manageEditorsUrlSkipped: false,
     setupComplete: true,
   };
-  const status = { authorized: true, expiresAt: now + 3_600_000, accessToken: 'ghu_bot_token' };
+  const status = {
+    authorized: true,
+    expiresAt: now + 3_600_000,
+    accessToken: 'ghu_bot_token',
+    account: { login: 'myclub-cms-bot', installations: 1 },
+  };
   const users = [{ email: 'redakteurin@example.com', firstSeen: now - 100_000, lastSeen: now }];
   const events = [
     { type: 'settings_updated', actor: 'admin@example.com', at: now - 200_000, detail: 'allowedDomains' },
