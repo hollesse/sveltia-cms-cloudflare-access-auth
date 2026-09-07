@@ -97,6 +97,8 @@ export interface Texts {
   dashboard: {
     brand: string;
     signedInAs: (email: string) => string;
+    accountMenuLabel: string;
+    signOut: string;
     navUsers: string;
     navGithub: string;
     navSettings: string;
@@ -331,6 +333,8 @@ const de: Texts = {
   dashboard: {
     brand: 'Sveltia CMS Cloudflare Access',
     signedInAs: (email) => `Angemeldet als ${email}`,
+    accountMenuLabel: 'Konto-Menü',
+    signOut: 'Abmelden',
     navUsers: 'Benutzer',
     navGithub: 'GitHub-Verbindung',
     navSettings: 'Einstellungen',
@@ -564,6 +568,8 @@ const en: Texts = {
   dashboard: {
     brand: 'Sveltia CMS Cloudflare Access',
     signedInAs: (email) => `Signed in as ${email}`,
+    accountMenuLabel: 'Account menu',
+    signOut: 'Sign out',
     navUsers: 'Users',
     navGithub: 'GitHub connection',
     navSettings: 'Settings',

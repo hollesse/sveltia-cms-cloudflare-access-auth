@@ -86,6 +86,8 @@ const ICON_TRASH = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" 
 const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.9 4.2A11 11 0 0 1 12 4c7 0 11 8 11 8a19 19 0 0 1-3 3.9M6.1 6.1A19 19 0 0 0 1 12s4 8 11 8a11 11 0 0 0 5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M1 1l22 22"/></svg>`;
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`;
 const ICON_AUDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a2 2 0 0 1 2 2v13l-3-2-2 2-2-2-3 2V6a2 2 0 0 1 2-2Z"/><path d="M9.5 9h5M9.5 12.5h5"/></svg>`;
+const ICON_CARET = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+const ICON_LOGOUT = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/></svg>`;
 
 /**
  * Zusaetzliche Design-Tokens fuer Wizard + Verwaltung (design-system-001,
@@ -105,7 +107,21 @@ const ADMIN_STYLE = `
   .topbar { display: flex; justify-content: space-between; align-items: center;
             padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--surface); }
   .topbar .brand { font-weight: 600; display: flex; align-items: center; gap: 10px; }
-  .topbar .who { font-size: 13px; color: var(--text-2); }
+  .topbar .who { font-size: 13px; color: var(--text-2); position: relative; }
+  .usermenu-toggle { display: inline-flex; align-items: center; gap: 6px; background: none;
+                     border: 1px solid transparent; color: inherit; font: inherit; cursor: pointer;
+                     padding: 6px 10px; border-radius: 8px; }
+  .usermenu-toggle:hover { border-color: var(--border); background: var(--bg); }
+  .usermenu-toggle svg { width: 14px; height: 14px; transition: transform .15s ease; }
+  .usermenu-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .usermenu { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; z-index: 30;
+              background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+              box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; }
+  .usermenu[hidden] { display: none; }
+  .usermenu-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+                   color: var(--text); text-decoration: none; font-size: 13px; }
+  .usermenu-item:hover { background: var(--bg); }
+  .usermenu-item svg { width: 16px; height: 16px; }
   .admin-inner { padding: 28px 20px; max-width: 1200px; margin: 0 auto; width: 100%; }
   .steps { display: flex; gap: 6px 8px; margin: 0 0 24px; padding: 0; list-style: none;
            font-size: 13px; flex-wrap: wrap; justify-content: center; }
@@ -1086,7 +1102,14 @@ ${settingsRow(
 
   const body = `<div class="topbar">
 <span class="brand">${escapeHtml(d.brand)}</span>
-<span class="who">${escapeHtml(d.signedInAs(email))}</span>
+<span class="who">
+<button class="usermenu-toggle" id="usermenuBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="usermenu" aria-label="${escapeHtmlAttribute(d.accountMenuLabel)}">
+<span>${escapeHtml(d.signedInAs(email))}</span>${ICON_CARET}
+</button>
+<div class="usermenu" id="usermenu" role="menu" hidden>
+<a class="usermenu-item" href="/cdn-cgi/access/logout" role="menuitem">${ICON_LOGOUT}<span>${d.signOut}</span></a>
+</div>
+</span>
 </div>
 <div class="shell" id="shell">
 <nav class="side" aria-label="${escapeHtmlAttribute(d.navSettings)}">
@@ -1128,6 +1151,27 @@ ${settingsRow(
       });
     });
   });
+
+  var usermenuBtn = document.getElementById('usermenuBtn');
+  var usermenu = document.getElementById('usermenu');
+  if (usermenuBtn && usermenu) {
+    var setMenu = function (open) {
+      usermenu.hidden = !open;
+      usermenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    usermenuBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      setMenu(usermenu.hidden);
+    });
+    document.addEventListener('click', function (event) {
+      if (!usermenu.hidden && !usermenu.contains(event.target) && event.target !== usermenuBtn) {
+        setMenu(false);
+      }
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !usermenu.hidden) { setMenu(false); usermenuBtn.focus(); }
+    });
+  }
 
   document.querySelectorAll('.editlink').forEach(function (link) {
     link.addEventListener('click', function () {
