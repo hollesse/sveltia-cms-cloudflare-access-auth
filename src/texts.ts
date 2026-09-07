@@ -150,6 +150,8 @@ export interface Texts {
     loginDisabledBadge: string;
     loginToggleHint: string;
     loginDisableConfirm: string;
+    loginToggleErrorRejected: string;
+    loginToggleErrorUnknown: string;
     collapseLabel: string;
     toggleMenuTitle: string;
     navAudit: string;
@@ -386,6 +388,8 @@ const de: Texts = {
     loginDisabledBadge: 'Deaktiviert',
     loginToggleHint: 'Steuert die Anmeldung am CMS. Deaktivieren wirkt sofort — auch für bereits offene Sessions bekommt niemand mehr ein Token (für Wartungsfenster oder als Notbremse). Der Zugang zu dieser Einstellungsseite bleibt davon unberührt. Der interne Token-Refresh läuft weiter; Aktivieren stellt den Normalbetrieb sofort wieder her.',
     loginDisableConfirm: 'CMS-Login wirklich deaktivieren? Danach kann sich niemand mehr am CMS anmelden, bis du ihn wieder aktivierst.',
+    loginToggleErrorRejected: 'Änderung abgelehnt — der Zustand wurde nicht geändert.',
+    loginToggleErrorUnknown: 'Netzwerkfehler — Zustand unbekannt. Bitte Seite neu laden.',
     collapseLabel: 'Einklappen',
     toggleMenuTitle: 'Menü ein-/ausklappen',
     navAudit: 'Audit-Log',
@@ -619,6 +623,8 @@ const en: Texts = {
     loginDisabledBadge: 'Disabled',
     loginToggleHint: 'Controls signing in to the CMS. Disabling takes effect immediately — even live sessions stop receiving tokens (for maintenance windows or as an emergency brake). Access to this settings page is unaffected. The internal token refresh keeps running; enabling restores normal operation right away.',
     loginDisableConfirm: 'Really disable CMS login? Nobody will be able to sign in to the CMS until you enable it again.',
+    loginToggleErrorRejected: 'Change rejected — the state was not changed.',
+    loginToggleErrorUnknown: 'Network error — state unknown. Please reload the page.',
     collapseLabel: 'Collapse',
     toggleMenuTitle: 'Collapse/expand menu',
     navAudit: 'Audit log',

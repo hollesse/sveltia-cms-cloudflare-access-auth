@@ -199,6 +199,7 @@ const ADMIN_STYLE = `
   .toggle-state { font-size: 13px; font-weight: 600; }
   .toggle-state.on { color: var(--ok); }
   .toggle-state.off { color: var(--danger); }
+  .toggle-error { color: var(--danger); font-size: 13px; margin: 6px 0 0; }
   .infotip { position: relative; display: inline-flex; align-items: center; margin-left: 6px;
              color: var(--text-2); cursor: help; vertical-align: middle; }
   .infotip:hover, .infotip:focus { color: var(--accent); outline: none; }
@@ -1028,6 +1029,7 @@ ${eventsTable}
 </label>
 <span class="toggle-state ${loginDisabled ? 'off' : 'on'}" id="loginToggleState">${loginDisabled ? d.loginDisabledBadge : d.loginActiveBadge}</span>
 </span>
+<p class="toggle-error" id="loginToggleError" role="alert" hidden></p>
 </span>`;
 
   // Naechste Cron-Rotation (0/6/12/18 UTC) serverseitig als ISO bestimmen;
@@ -1315,6 +1317,17 @@ ${settingsRow(
   }
   var loginToggle = document.getElementById('loginToggle');
   if (loginToggle) {
+    var loginToggleError = document.getElementById('loginToggleError');
+    var showLoginToggleError = function (message) {
+      if (!loginToggleError) { return; }
+      loginToggleError.textContent = message;
+      loginToggleError.hidden = false;
+    };
+    var hideLoginToggleError = function () {
+      if (!loginToggleError) { return; }
+      loginToggleError.hidden = true;
+      loginToggleError.textContent = '';
+    };
     loginToggle.addEventListener('change', function () {
       // Checked = Login aktiv. Abwaehlen (= deaktivieren) fragt zur Sicherheit
       // nach; Wiederaktivieren ist unkritisch.
@@ -1329,14 +1342,27 @@ ${settingsRow(
         body: JSON.stringify({ disabled: willDisable }),
       }).then(function (r) { return r.json(); }).then(function (res) {
         loginToggle.disabled = false;
-        if (!res || res.ok !== true) { loginToggle.checked = !willDisable; return; }
+        if (!res || res.ok !== true) {
+          // Abgelehnt -> Zustand VOR dem Klick wiederherstellen (nicht den soeben
+          // angeklickten neuen Zustand — das waere ein No-op).
+          loginToggle.checked = willDisable;
+          showLoginToggleError(${JSON.stringify(d.loginToggleErrorRejected)});
+          return;
+        }
+        hideLoginToggleError();
         // In-place aktualisieren statt Reload — der Nutzer bleibt auf den Einstellungen.
         var state = document.getElementById('loginToggleState');
         if (state) {
           state.textContent = willDisable ? ${JSON.stringify(d.loginDisabledBadge)} : ${JSON.stringify(d.loginActiveBadge)};
           state.className = 'toggle-state ' + (willDisable ? 'off' : 'on');
         }
-      }).catch(function () { loginToggle.disabled = false; loginToggle.checked = !willDisable; });
+      }).catch(function () {
+        loginToggle.disabled = false;
+        // Netzwerk-/Parsefehler: Serverzustand unklar -> ebenfalls Zustand VOR
+        // dem Klick wiederherstellen und explizit auf die Unklarheit hinweisen.
+        loginToggle.checked = willDisable;
+        showLoginToggleError(${JSON.stringify(d.loginToggleErrorUnknown)});
+      });
     });
   }
   var reconnectBtn = document.getElementById('reconnectBtn');

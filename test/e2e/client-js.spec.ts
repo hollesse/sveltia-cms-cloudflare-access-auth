@@ -113,6 +113,132 @@ test.describe('interactive client behaviour', () => {
     await expect(page.locator('#loginToggle')).not.toBeChecked();
   });
 
+  test('disabling shows a visible error and restores the previous (enabled) state when the server rejects the change', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: false }) }),
+    );
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const toggle = page.locator('#loginToggle');
+    const state = page.locator('#loginToggleState');
+    const error = page.locator('#loginToggleError');
+    await expect(error).toBeHidden();
+
+    await page.locator('label.toggle-switch').click();
+
+    // Rejected: the switch must show the PREVIOUS (enabled) state again, not the
+    // rejected new (disabled) state, and a visible error must explain why.
+    await expect(toggle).toBeChecked();
+    await expect(state).toHaveText('Enabled');
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText('Change rejected — the state was not changed.');
+    await expect(toggle).toBeEnabled();
+  });
+
+  test('disabling shows a visible error and restores the previous (enabled) state on a network error', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.route('**/setup/login', (route) => route.abort());
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const toggle = page.locator('#loginToggle');
+    const state = page.locator('#loginToggleState');
+    const error = page.locator('#loginToggleError');
+
+    await page.locator('label.toggle-switch').click();
+
+    await expect(toggle).toBeChecked();
+    await expect(state).toHaveText('Enabled');
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText('Network error — state unknown. Please reload the page.');
+    await expect(toggle).toBeEnabled();
+  });
+
+  test('re-enabling shows a visible error and restores the previous (disabled) state when the server rejects the change', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const toggle = page.locator('#loginToggle');
+    const state = page.locator('#loginToggleState');
+    const error = page.locator('#loginToggleError');
+
+    // First, disable successfully so the switch starts from the "disabled" state.
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, disabled: true }) }),
+    );
+    await page.locator('label.toggle-switch').click();
+    await expect(state).toHaveText('Disabled');
+    await expect(toggle).not.toBeChecked();
+
+    // Now attempt to re-enable, but the server rejects it.
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: false }) }),
+    );
+    await page.locator('label.toggle-switch').click();
+
+    await expect(toggle).not.toBeChecked();
+    await expect(state).toHaveText('Disabled');
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText('Change rejected — the state was not changed.');
+    await expect(toggle).toBeEnabled();
+  });
+
+  test('re-enabling shows a visible error and restores the previous (disabled) state on a network error', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const toggle = page.locator('#loginToggle');
+    const state = page.locator('#loginToggleState');
+    const error = page.locator('#loginToggleError');
+
+    // First, disable successfully so the switch starts from the "disabled" state.
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, disabled: true }) }),
+    );
+    await page.locator('label.toggle-switch').click();
+    await expect(state).toHaveText('Disabled');
+    await expect(toggle).not.toBeChecked();
+
+    // Now attempt to re-enable, but the request is aborted (server state unknown).
+    await page.route('**/setup/login', (route) => route.abort());
+    await page.locator('label.toggle-switch').click();
+
+    await expect(toggle).not.toBeChecked();
+    await expect(state).toHaveText('Disabled');
+    await expect(error).toBeVisible();
+    await expect(error).toHaveText('Network error — state unknown. Please reload the page.');
+    await expect(toggle).toBeEnabled();
+  });
+
+  test('a previously shown error is hidden again after a subsequent successful change', async ({ page }) => {
+    expect(dashboard, 'dashboard page must render').toBeTruthy();
+    await serve(page, dashboard!.html, '/setup');
+    await page.locator('.navbtn[data-section="settings"]').click();
+    page.on('dialog', (dialog) => void dialog.accept());
+
+    const error = page.locator('#loginToggleError');
+
+    await page.route('**/setup/login', (route) => route.abort());
+    await page.locator('label.toggle-switch').click();
+    await expect(error).toBeVisible();
+
+    await page.route('**/setup/login', (route) =>
+      route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, disabled: true }) }),
+    );
+    await page.locator('label.toggle-switch').click();
+
+    await expect(page.locator('#loginToggleState')).toHaveText('Disabled');
+    await expect(error).toBeHidden();
+  });
+
   test('the login hint is a tooltip that appears on hover', async ({ page }) => {
     expect(dashboard, 'dashboard page must render').toBeTruthy();
     await serve(page, dashboard!.html, '/setup');
