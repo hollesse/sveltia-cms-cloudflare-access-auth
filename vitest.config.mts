@@ -93,8 +93,16 @@ export default {
         return json({ message: 'mocked failure' }, 500);
       }
 
+      // Der device_code wird serverseitig gehalten; Tests waehlen das
+      // Poll-Ergebnis ueber die Client-ID, mit der sie den Flow starten.
+      const deviceCodeByClient = {
+        'client-pending': 'device-pending',
+        'client-slow': 'device-slow',
+        'client-badaccount': 'device-badaccount',
+      };
+
       return json({
-        device_code: body.client_id === 'client-pending' ? 'device-pending' : 'device-ok',
+        device_code: deviceCodeByClient[body.client_id] ?? 'device-ok',
         user_code: 'ABCD-1234',
         verification_uri: 'https://github.com/login/device',
         interval: 5,

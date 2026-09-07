@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TokenStore } from '../../src/token-store.js';
 import type { Env } from '../../src/types.js';
 import { signTestAccessJwt } from '../helpers/access-identity.js';
+import { connectBot } from '../helpers/device-flow.js';
 
 const testEnv = env as unknown as Env;
 
@@ -78,17 +79,8 @@ describe('GET /setup — wizard vs. dashboard (ADR 0014)', () => {
       MANAGE_EDITORS_URL: '',
     });
 
-    const startResponse = await SELF.fetch('https://worker.example.com/setup/github/start', {
-      method: 'POST',
-      headers: await adminHeaders(),
-    });
-    expect((await startResponse.json() as { ok: boolean }).ok).toBe(true);
-
-    await SELF.fetch('https://worker.example.com/setup/github/poll', {
-      method: 'POST',
-      headers: { ...(await adminHeaders()), 'content-type': 'application/json' },
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
-    });
+    const connected = await connectBot('https://worker.example.com', await adminHeaders());
+    expect((await connected.json() as { ok: boolean }).ok).toBe(true);
 
     const response = await SELF.fetch('https://worker.example.com/setup', {
       headers: await adminHeaders(),
@@ -121,15 +113,7 @@ describe('Dashboard-Einstellungen — Pro-Wert-Formulare statt window.prompt() (
       MANAGE_EDITORS_URL: '',
     });
 
-    await SELF.fetch('https://worker.example.com/setup/github/start', {
-      method: 'POST',
-      headers: await adminHeaders(),
-    });
-    await SELF.fetch('https://worker.example.com/setup/github/poll', {
-      method: 'POST',
-      headers: { ...(await adminHeaders()), 'content-type': 'application/json' },
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
-    });
+    await connectBot('https://worker.example.com', await adminHeaders());
 
     const dashboard = await SELF.fetch('https://worker.example.com/setup', {
       headers: await adminHeaders(),
@@ -290,15 +274,7 @@ describe('Vollstaendiger Wizard-Durchlauf (Acceptance Criterion: frisches Deploy
       headers,
       body: JSON.stringify({ githubAppClientId: 'Iv1.testclientid' }),
     });
-    await SELF.fetch('https://worker.example.com/setup/github/start', {
-      method: 'POST',
-      headers: await adminHeaders(),
-    });
-    await SELF.fetch('https://worker.example.com/setup/github/poll', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
-    });
+    await connectBot('https://worker.example.com', await adminHeaders());
 
     // Schritt 3: Website freischalten.
     await SELF.fetch('https://worker.example.com/setup/settings', {
@@ -381,14 +357,15 @@ describe('Wizard Schritt 2 — Device Flow laeuft INLINE auf der Seite (Verifier
     expect(pollUrl, 'step 3 must poll the device flow inline (no dead end)').toBeDefined();
     expect(step3Calls.indexOf(startUrl!)).toBeLessThan(step3Calls.indexOf(pollUrl!));
 
-    await SELF.fetch(new URL(startUrl!, 'https://worker.example.com'), {
+    const startRes = await SELF.fetch(new URL(startUrl!, 'https://worker.example.com'), {
       method: 'POST',
       headers: await adminHeaders(),
     });
+    const startBody = (await startRes.json()) as { txId?: string };
     await SELF.fetch(new URL(pollUrl!, 'https://worker.example.com'), {
       method: 'POST',
       headers,
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
+      body: JSON.stringify({ txId: startBody.txId }),
     });
 
     // Die Zustandsweiche: nach erfolgreichem Poll zeigt /setup Schritt 3.

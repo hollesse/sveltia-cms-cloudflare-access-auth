@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TokenStore } from '../../src/token-store.js';
 import type { Env } from '../../src/types.js';
 import { signTestAccessJwt } from '../helpers/access-identity.js';
+import { connectBot } from '../helpers/device-flow.js';
 
 /**
- * Security-Event-Audit-Log (auth-n4v6c): unveränderliche Ereignisse für
+ * Security-Event-Audit-Log: unveränderliche Ereignisse für
  * Settings-Änderungen, Connect/Disconnect und Rotation — mit Akteur + Zeit,
  * ohne Tokenwerte, append-only (Cap 200), nicht per UI löschbar.
  */
@@ -100,11 +101,7 @@ describe('setup handlers record security events', () => {
   });
 
   it('records bot_connected after a successful device-flow poll', async () => {
-    await SELF.fetch(`${ORIGIN}/setup/github/poll`, {
-      method: 'POST',
-      headers: await jsonHeaders(),
-      body: JSON.stringify({ deviceCode: 'device-ok' }),
-    });
+    await connectBot(ORIGIN, await jsonHeaders());
     expect(await types()).toContain('bot_connected');
   });
 });

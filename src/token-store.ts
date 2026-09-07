@@ -14,7 +14,7 @@ export type GetTokenResult =
   | { ok: true; token: string }
   | { ok: false; reason: 'not_authorized' | 'refresh_failed' };
 
-/** Verifiziertes GitHub-Konto der aktuellen Autorisierung (auth-v8n3c). */
+/** Verifiziertes GitHub-Konto der aktuellen Autorisierung. */
 export interface AccountInfo {
   login: string;
   installations: number;
@@ -66,6 +66,25 @@ export interface StoredSettings {
 const SETTINGS_KEY = 'settings:v1';
 const USERS_KEY = 'users:v1';
 const ACCOUNT_KEY = 'account:v1';
+const PENDING_FLOW_KEY = 'pending-flow:v1';
+
+/**
+ * Serverseitiger Zustand eines laufenden Device Flows. Bindet die
+ * Transaktion an die Admin-Session, die sie gestartet hat — `poll` schliesst
+ * nur den eigenen, noch gueltigen Flow ab.
+ */
+export interface PendingDeviceFlow {
+  /** Opaque, an den Browser gegebene Transaktions-ID (kein Geheimnis). */
+  txId: string;
+  /** Der eigentliche GitHub-`device_code` — verlaesst den Worker nicht. */
+  deviceCode: string;
+  /** Client-ID, mit der der Flow gestartet wurde. */
+  clientId: string;
+  /** E-Mail des Setup-Admins, der den Flow gestartet hat. */
+  admin: string;
+  /** Ablaufzeitpunkt (ms seit Epoch); danach ist die Transaktion ungueltig. */
+  expiresAt: number;
+}
 
 /** Login-Historie eines Redakteurs (Betriebs-/Audit-Log, ADR 0015). */
 export interface UserRecord {
@@ -75,11 +94,11 @@ export interface UserRecord {
 }
 
 const EVENTS_KEY = 'events:v1';
-/** Cap: nur die neuesten N Sicherheitsereignisse werden vorgehalten (auth-n4v6c). */
+/** Cap: nur die neuesten N Sicherheitsereignisse werden vorgehalten. */
 const MAX_EVENTS = 200;
 
 /**
- * Unveraenderliches Sicherheitsereignis (auth-n4v6c): wer (`actor`) wann (`at`)
+ * Unveraenderliches Sicherheitsereignis: wer (`actor`) wann (`at`)
  * was (`type`) getan hat, mit optionalem `detail`. Bewusst OHNE Tokenwerte /
  * Secrets. Append-only, gedeckelt, nicht per UI loeschbar — anders als die
  * Login-Historie.
@@ -113,9 +132,30 @@ export class TokenStore extends DurableObject<Env> {
     await this.bumpGeneration();
   }
 
-  /** Speichert das verifizierte GitHub-Konto der aktuellen Autorisierung (auth-v8n3c). */
+  /** Speichert das verifizierte GitHub-Konto der aktuellen Autorisierung. */
   async storeAccount(account: AccountInfo): Promise<void> {
     await this.ctx.storage.put(ACCOUNT_KEY, account);
+  }
+
+  /**
+   * Merkt sich einen gestarteten Device Flow serverseitig: der
+   * rohe `device_code` bleibt im Worker; der Browser erhaelt nur die opaque
+   * `txId`. Nur EIN Flow gleichzeitig — ein neuer Start ersetzt den vorigen.
+   * Gebunden an Admin-Identitaet, Client-ID und Ablauf, damit `poll` fremde
+   * oder untergeschobene Codes nicht abschliessen kann.
+   */
+  async storePendingFlow(flow: PendingDeviceFlow): Promise<void> {
+    await this.ctx.storage.put(PENDING_FLOW_KEY, flow);
+  }
+
+  /** Liest den gestarteten Device Flow (oder null, wenn keiner laeuft). */
+  async getPendingFlow(): Promise<PendingDeviceFlow | null> {
+    return (await this.ctx.storage.get<PendingDeviceFlow>(PENDING_FLOW_KEY)) ?? null;
+  }
+
+  /** Verwirft den gemerkten Device Flow (nach Abschluss oder hartem Fehler). */
+  async clearPendingFlow(): Promise<void> {
+    await this.ctx.storage.delete(PENDING_FLOW_KEY);
   }
 
   /**
@@ -156,7 +196,7 @@ export class TokenStore extends DurableObject<Env> {
 
   /**
    * Haengt ein Sicherheitsereignis an (append-only, Cap MAX_EVENTS): nur
-   * `type`/`actor`/`detail`/`at` — nie Tokenwerte. Kein Loesch-Pendant (auth-n4v6c).
+   * `type`/`actor`/`detail`/`at` — nie Tokenwerte. Kein Loesch-Pendant.
    */
   async recordEvent(event: { type: string; actor: string; detail?: string }, now: number): Promise<void> {
     const events = (await this.ctx.storage.get<AuditEvent[]>(EVENTS_KEY)) ?? [];

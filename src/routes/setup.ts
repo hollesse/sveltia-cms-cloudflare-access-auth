@@ -317,7 +317,28 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
 
     const started = await startDeviceFlow(clientId);
 
-    return Response.json(started, { status: started.ok ? 200 : 502 });
+    if (!started.ok) {
+      return Response.json(started, { status: 502 });
+    }
+
+    // Den rohen device_code serverseitig halten; der Browser
+    // erhaelt nur eine opaque txId, gebunden an diese Admin-Session + Client-ID.
+    const txId = crypto.randomUUID();
+    await tokenStore.storePendingFlow({
+      txId,
+      deviceCode: started.deviceCode,
+      clientId,
+      admin: email,
+      expiresAt: Date.now() + started.expiresIn * 1000,
+    });
+
+    return Response.json({
+      ok: true,
+      txId,
+      userCode: started.userCode,
+      verificationUri: started.verificationUri,
+      interval: started.interval,
+    });
   }
 
   if (url.pathname === '/setup/login' && request.method === 'POST') {
@@ -386,28 +407,56 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
       return Response.json({ ok: false, reason: 'missing_client_id' }, { status: 400 });
     }
 
-    const body = (await request.json().catch(() => ({}))) as { deviceCode?: string };
+    const body = (await request.json().catch(() => ({}))) as { txId?: string };
 
-    if (!body.deviceCode) {
-      return Response.json({ ok: false, reason: 'missing_device_code' }, { status: 400 });
+    if (!body.txId) {
+      return Response.json({ ok: false, reason: 'missing_tx_id' }, { status: 400 });
     }
 
-    const polled = await pollDeviceFlow(clientId, body.deviceCode);
+    const pending = await tokenStore.getPendingFlow();
+
+    // Nur die eigene, laufende Transaktion abschliessen: die txId
+    // muss passen, an dieselbe Admin-Identitaet und Client-ID gebunden und noch
+    // nicht abgelaufen sein. Sonst wird nichts gespeichert — ein fremder oder
+    // untergeschobener device_code kann das Bot-Paar nicht ueberschreiben.
+    if (
+      !pending ||
+      pending.txId !== body.txId ||
+      pending.admin !== email ||
+      pending.clientId !== clientId ||
+      pending.expiresAt <= Date.now()
+    ) {
+      if (pending && pending.expiresAt <= Date.now()) {
+        await tokenStore.clearPendingFlow();
+      }
+
+      return Response.json({ ok: false, reason: 'unknown_transaction' }, { status: 400 });
+    }
+
+    const polled = await pollDeviceFlow(clientId, pending.deviceCode);
 
     if (polled.ok) {
-      // Vor dem Speichern verifizieren, WELCHES Konto autorisiert hat (auth-v8n3c):
+      // Vor dem Speichern verifizieren, WELCHES Konto autorisiert hat:
       // ein ungueltiges Token wird nicht abgelegt (keine stille Fehlverbindung).
       const verified = await verifyAuthorization(polled.pair.accessToken);
 
       if (!verified.ok) {
+        await tokenStore.clearPendingFlow();
+
         return Response.json({ ok: false, reason: verified.reason }, { status: 502 });
       }
 
       await tokenStore.storeAuthorization(polled.pair);
       await tokenStore.storeAccount({ login: verified.login, installations: verified.installations });
       await tokenStore.recordEvent({ type: 'bot_connected', actor: email, detail: verified.login }, Date.now());
+      await tokenStore.clearPendingFlow();
 
       return Response.json({ ok: true });
+    }
+
+    // pending/slow_down: Transaktion laeuft weiter; harter Fehler: verwerfen.
+    if (polled.reason !== 'pending' && polled.reason !== 'slow_down') {
+      await tokenStore.clearPendingFlow();
     }
 
     return Response.json(polled, {
