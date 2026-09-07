@@ -490,3 +490,64 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
     expect(empty.length).toBe(0);
   });
 });
+
+describe('Client-ID-Wechsel entwertet die gespeicherte Autorisierung (auth-g5h9j, R3d)', () => {
+  it('invalidates a previously connected bot token when the GitHub App client ID changes', async () => {
+    seedFreshDeploymentEnv();
+    const headers = { ...(await adminHeaders()), 'content-type': 'application/json' };
+
+    await SELF.fetch('https://worker.example.com/setup/settings', {
+      method: 'POST', headers, body: JSON.stringify({ accessAppAud: PRESENTED_AUD }),
+    });
+    await SELF.fetch('https://worker.example.com/setup/settings', {
+      method: 'POST', headers, body: JSON.stringify({ githubAppClientId: 'client-app-a' }),
+    });
+    const connected = await connectBot('https://worker.example.com', await adminHeaders());
+    expect(connected.status).toBe(200);
+    expect(await connected.json()).toEqual({ ok: true });
+
+    // Ein zweiter Device Flow laeuft noch (nicht abgeschlossen), waehrend der
+    // Client-ID-Wechsel passiert — er darf danach nicht mehr abschliessbar sein
+    // (auth-g5h9j, R3d deckt bisher nur die Autorisierung ab, nicht den Pending-Flow).
+    const secondStart = await SELF.fetch('https://worker.example.com/setup/github/start', {
+      method: 'POST', headers: await adminHeaders(),
+    });
+    const { txId: staleTxId } = (await secondStart.json()) as { txId: string };
+    expect(staleTxId).toBeTypeOf('string');
+
+    const stub = testEnv.TOKEN_STORE.get(testEnv.TOKEN_STORE.idFromName('bot'));
+    expect(await runInDurableObject(stub, (instance: TokenStore) => instance.getPendingFlow())).not.toBeNull();
+
+    // Client-ID-Wechsel: andere GitHub App gespeichert.
+    const changed = await SELF.fetch('https://worker.example.com/setup/settings', {
+      method: 'POST', headers, body: JSON.stringify({ githubAppClientId: 'client-app-b' }),
+    });
+    expect(changed.status).toBe(200);
+
+    // Der Pending-Flow der alten App wurde mit entwertet, nicht nur die
+    // gespeicherte Autorisierung.
+    expect(await runInDurableObject(stub, (instance: TokenStore) => instance.getPendingFlow())).toBeNull();
+
+    const staleFlowPoll = await SELF.fetch('https://worker.example.com/setup/github/poll', {
+      method: 'POST', headers, body: JSON.stringify({ txId: staleTxId }),
+    });
+    expect(staleFlowPoll.status).toBe(400);
+    expect(await staleFlowPoll.json()).toMatchObject({ ok: false, reason: 'unknown_transaction' });
+
+    await SELF.fetch('https://worker.example.com/setup/settings', {
+      method: 'POST', headers, body: JSON.stringify({ allowedDomains: 'cms.example.com' }),
+    });
+
+    const editorToken = await signTestAccessJwt(PRESENTED_AUD, ISSUER, {
+      email: 'redakteurin@example.com',
+    });
+    const login = await SELF.fetch(
+      'https://worker.example.com/auth/access?site_id=cms.example.com',
+      { headers: { 'Cf-Access-Jwt-Assertion': editorToken } },
+    );
+
+    // Kein Token der alten App B — die Autorisierung wurde beim Wechsel entwertet.
+    expect(login.status).toBe(502);
+    expect(await login.text()).toContain('nicht mit GitHub verbunden');
+  });
+});

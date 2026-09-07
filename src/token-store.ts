@@ -153,9 +153,63 @@ export class TokenStore extends DurableObject<Env> {
     return (await this.ctx.storage.get<PendingDeviceFlow>(PENDING_FLOW_KEY)) ?? null;
   }
 
-  /** Verwirft den gemerkten Device Flow (nach Abschluss oder hartem Fehler). */
-  async clearPendingFlow(): Promise<void> {
+  /**
+   * Verwirft den gemerkten Device Flow (nach Abschluss oder hartem Fehler) —
+   * aber NUR, wenn der gespeicherte Flow noch genau diese `txId` traegt. Eine
+   * veraltete Antwort (z. B. nach Ablauf- oder Fehler-Cleanup einer laengst
+   * ersetzten Transaktion) darf einen inzwischen neu gestarteten Flow nicht
+   * mit entfernen.
+   */
+  async clearPendingFlow(txId: string): Promise<void> {
+    const pending = await this.ctx.storage.get<PendingDeviceFlow>(PENDING_FLOW_KEY);
+
+    if (pending && pending.txId === txId) {
+      await this.ctx.storage.delete(PENDING_FLOW_KEY);
+    }
+  }
+
+  /**
+   * Atomarer Abschluss eines Device Flows (Reaudit R3, auth-g5h9j): der
+   * Aufrufer hat die externen GitHub-Abfragen (Poll + Kontoverifikation)
+   * bereits erledigt und liefert das fertige Ergebnis — diese Methode prueft
+   * den DANN aktuellen Pending-Flow ERNEUT gegen txId/Admin/Client-ID/Ablauf,
+   * bevor sie schreibt. Zwischen dieser Pruefung und dem Schreiben liegt KEIN
+   * fetch mehr, also haelt das DO-Input-Gate beides atomar zusammen: ein
+   * zwischenzeitlicher Disconnect oder ein neu gestarteter Flow (beide
+   * aendern den gespeicherten Pending-Flow) lassen die Pruefung fehlschlagen,
+   * OHNE dass etwas gespeichert oder der (dann fremde) Pending-Flow geloescht
+   * wird.
+   */
+  async completePendingFlow(
+    txId: string,
+    clientId: string,
+    admin: string,
+    now: number,
+    pair: TokenPair,
+    account: AccountInfo,
+  ): Promise<{ ok: boolean }> {
+    const pending = await this.ctx.storage.get<PendingDeviceFlow>(PENDING_FLOW_KEY);
+
+    if (
+      !pending ||
+      pending.txId !== txId ||
+      pending.admin !== admin ||
+      pending.clientId !== clientId ||
+      pending.expiresAt <= now
+    ) {
+      return { ok: false };
+    }
+
+    await this.ctx.storage.put({
+      accessToken: pair.accessToken,
+      expiresAt: pair.expiresAt,
+      refreshToken: pair.refreshToken,
+      [ACCOUNT_KEY]: account,
+    });
     await this.ctx.storage.delete(PENDING_FLOW_KEY);
+    await this.bumpGeneration();
+
+    return { ok: true };
   }
 
   /**
@@ -219,10 +273,19 @@ export class TokenStore extends DurableObject<Env> {
   /**
    * Trennt die Verbindung: loescht das Token-Paar (fuer Wizard-Neudurchlauf
    * bzw. Betreiber-Wunsch). Widerruft NICHT bei GitHub — das geschieht in den
-   * GitHub-Einstellungen des Bot-Accounts (Applications -> Authorized).
+   * GitHub-Einstellungen des Bot-Accounts (Applications -> Authorized). Ein
+   * noch laufender Pending-Flow wird mit entwertet (Reaudit R3, auth-g5h9j):
+   * sonst koennte eine alte, noch nicht abgeschlossene Transaktion nach dem
+   * Disconnect weiter abgeschlossen werden.
    */
   async clearAuthorization(): Promise<void> {
-    await this.ctx.storage.delete(['accessToken', 'expiresAt', 'refreshToken', ACCOUNT_KEY]);
+    await this.ctx.storage.delete([
+      'accessToken',
+      'expiresAt',
+      'refreshToken',
+      ACCOUNT_KEY,
+      PENDING_FLOW_KEY,
+    ]);
     await this.bumpGeneration();
   }
 
@@ -277,13 +340,34 @@ export class TokenStore extends DurableObject<Env> {
   /**
    * Partial-Update der Settings: reines Merge + Speichern. Validierung
    * passiert im Worker (Route `POST /setup/settings`, `config.ts`) — das DO
-   * ist bewusst dumm (ADR 0014).
+   * ist bewusst dumm (ADR 0014); ob invalidiert wird (z. B. Client-ID-
+   * Wechsel), entscheidet daher der Aufrufer, nicht diese Methode.
+   *
+   * `invalidateAuthorization` (Reaudit R3, auth-g5h9j): loescht Token-Paar,
+   * Konto UND einen laufenden Pending-Flow atomar mit dem Settings-Write und
+   * bumpt die Generation — sonst wuerde ein Client-ID-Wechsel ein Bot-Token
+   * der vorherigen App weiter ausgeben bzw. einen noch laufenden Flow der
+   * alten Client-ID unbemerkt abschliessbar lassen.
    */
-  async updateSettings(partial: StoredSettings): Promise<StoredSettings> {
+  async updateSettings(
+    partial: StoredSettings,
+    options?: { invalidateAuthorization?: boolean },
+  ): Promise<StoredSettings> {
     const current = await this.getSettings();
     const next: StoredSettings = { ...current, ...partial };
 
     await this.ctx.storage.put(SETTINGS_KEY, next);
+
+    if (options?.invalidateAuthorization) {
+      await this.ctx.storage.delete([
+        'accessToken',
+        'expiresAt',
+        'refreshToken',
+        ACCOUNT_KEY,
+        PENDING_FLOW_KEY,
+      ]);
+      await this.bumpGeneration();
+    }
 
     return next;
   }

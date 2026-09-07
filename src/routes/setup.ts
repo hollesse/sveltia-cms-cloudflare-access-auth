@@ -102,6 +102,7 @@ async function handleUpdateSettings(
   tokenStore: ReturnType<Env['TOKEN_STORE']['get']>,
   presentedAud: string | undefined,
   email: string,
+  currentClientId: string | undefined,
 ): Promise<Response> {
   const body = (await request.json().catch(() => null)) as SettingsUpdateBody | null;
 
@@ -180,7 +181,34 @@ async function handleUpdateSettings(
     partial.wizardDone = true;
   }
 
-  const updated = await tokenStore.updateSettings(partial);
+  // Client-ID-Wechsel entwertet die gespeicherte Autorisierung + einen
+  // laufenden Pending-Flow (Reaudit R3, auth-g5h9j): Vergleich gegen die
+  // EFFEKTIVE aktuelle Client-ID (inkl. Env-Fallback), nicht nur gegen den
+  // gespeicherten Settings-Wert — sonst wuerde ein migriertes Deployment
+  // (Client-ID nur aus Env) den Wechsel nicht erkennen. Der ERSTMALIGE Bezug
+  // einer Client-ID (vorher unbekannt, Wizard-Schritt 2) ist kein Wechsel —
+  // es gibt noch nichts Fremdes zu entwerten.
+  const clientIdChanged =
+    currentClientId !== undefined &&
+    partial.githubAppClientId !== undefined &&
+    partial.githubAppClientId !== currentClientId;
+
+  const updated = await tokenStore.updateSettings(partial, {
+    invalidateAuthorization: clientIdChanged,
+  });
+
+  if (clientIdChanged) {
+    await tokenStore.recordEvent(
+      {
+        type: 'github_client_id_changed',
+        actor: email,
+        // clientIdChanged garantiert currentClientId !== undefined (s. o.).
+        detail: `${currentClientId} -> ${partial.githubAppClientId}`,
+      },
+      Date.now(),
+    );
+  }
+
   await tokenStore.recordEvent(
     { type: 'settings_updated', actor: email, detail: Object.keys(body).join(', ') },
     Date.now(),
@@ -302,7 +330,7 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
   }
 
   if (url.pathname === '/setup/settings' && request.method === 'POST') {
-    return handleUpdateSettings(request, tokenStore, presentedAud, email);
+    return handleUpdateSettings(request, tokenStore, presentedAud, email, config.githubAppClientId);
   }
 
   if (url.pathname === '/setup/github' && request.method === 'GET') {
@@ -416,21 +444,24 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
       return Response.json({ ok: false, reason: 'missing_tx_id' }, { status: 400 });
     }
 
+    const txId = body.txId;
     const pending = await tokenStore.getPendingFlow();
 
-    // Nur die eigene, laufende Transaktion abschliessen: die txId
-    // muss passen, an dieselbe Admin-Identitaet und Client-ID gebunden und noch
-    // nicht abgelaufen sein. Sonst wird nichts gespeichert — ein fremder oder
-    // untergeschobener device_code kann das Bot-Paar nicht ueberschreiben.
+    // Vor-Check, spart einen GitHub-Roundtrip bei offensichtlich falscher
+    // Transaktion (txId, Admin-Identitaet, Client-ID, Ablauf). Der
+    // VERBINDLICHE Check gegen den DANN aktuellen Pending-Flow passiert erst
+    // in completePendingFlow, NACH den externen Abfragen unten — dazwischen
+    // kann ein Disconnect oder ein neu gestarteter Flow liegen (Reaudit R3,
+    // auth-g5h9j).
     if (
       !pending ||
-      pending.txId !== body.txId ||
+      pending.txId !== txId ||
       pending.admin !== email ||
       pending.clientId !== clientId ||
       pending.expiresAt <= Date.now()
     ) {
       if (pending && pending.expiresAt <= Date.now()) {
-        await tokenStore.clearPendingFlow();
+        await tokenStore.clearPendingFlow(pending.txId);
       }
 
       return Response.json({ ok: false, reason: 'unknown_transaction' }, { status: 400 });
@@ -444,22 +475,37 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
       const verified = await verifyAuthorization(polled.pair.accessToken);
 
       if (!verified.ok) {
-        await tokenStore.clearPendingFlow();
+        await tokenStore.clearPendingFlow(txId);
 
         return Response.json({ ok: false, reason: verified.reason }, { status: 502 });
       }
 
-      await tokenStore.storeAuthorization(polled.pair);
-      await tokenStore.storeAccount({ login: verified.login, installations: verified.installations });
+      // Atomarer Abschluss (Reaudit R3, auth-g5h9j): prueft den Pending-Flow
+      // ERNEUT gegen den dann aktuellen Stand und schreibt nur, wenn er noch
+      // passt — ein zwischenzeitlicher Disconnect oder ein neuer Flow lassen
+      // diesen (dann veralteten) Abschluss abgewiesen werden, ohne etwas zu
+      // speichern oder den fremden Pending-Flow zu loeschen.
+      const completed = await tokenStore.completePendingFlow(
+        txId,
+        clientId,
+        email,
+        Date.now(),
+        polled.pair,
+        { login: verified.login, installations: verified.installations },
+      );
+
+      if (!completed.ok) {
+        return Response.json({ ok: false, reason: 'unknown_transaction' }, { status: 400 });
+      }
+
       await tokenStore.recordEvent({ type: 'bot_connected', actor: email, detail: verified.login }, Date.now());
-      await tokenStore.clearPendingFlow();
 
       return Response.json({ ok: true });
     }
 
     // pending/slow_down: Transaktion laeuft weiter; harter Fehler: verwerfen.
     if (polled.reason !== 'pending' && polled.reason !== 'slow_down') {
-      await tokenStore.clearPendingFlow();
+      await tokenStore.clearPendingFlow(txId);
     }
 
     return Response.json(polled, {
