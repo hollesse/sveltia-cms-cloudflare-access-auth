@@ -44,4 +44,20 @@ describe('editor login toggle switch', () => {
     const input = html.slice(html.indexOf('id="loginToggle"') - 200, html.indexOf('id="loginToggle"') + 200);
     expect(input).not.toContain('checked');
   });
+
+  it('labels the control "CMS Login" and never says "Redakteur"', async () => {
+    const t = pickTexts('de');
+    const html = await renderDashboardPage(baseConfig(false), status, [], [], 'admin@example.com', 'aud-value', t).text();
+
+    expect(await html).toContain('CMS Login');
+    expect(await html).not.toContain('Redakteur');
+  });
+
+  it('puts the explanatory hint into a tooltip behind an info icon, not inline', async () => {
+    const html = await render(false);
+
+    expect(html).toContain('class="infotip"');
+    // The hint text lives inside the tooltip bubble.
+    expect(html).toContain('infotip-bubble');
+  });
 });

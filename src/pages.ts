@@ -87,6 +87,7 @@ const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none
 const ICON_CHEVRON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`;
 const ICON_AUDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h6a2 2 0 0 1 2 2v13l-3-2-2 2-2-2-3 2V6a2 2 0 0 1 2-2Z"/><path d="M9.5 9h5M9.5 12.5h5"/></svg>`;
 const ICON_CARET = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+const ICON_INFO = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>`;
 const ICON_LOGOUT = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 17l5-5-5-5M20 12H9M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/></svg>`;
 
 /**
@@ -198,6 +199,16 @@ const ADMIN_STYLE = `
   .toggle-state { font-size: 13px; font-weight: 600; }
   .toggle-state.on { color: var(--ok); }
   .toggle-state.off { color: var(--danger); }
+  .infotip { position: relative; display: inline-flex; align-items: center; margin-left: 6px;
+             color: var(--text-2); cursor: help; vertical-align: middle; }
+  .infotip:hover, .infotip:focus { color: var(--accent); outline: none; }
+  .infotip-bubble { position: absolute; left: 0; top: calc(100% + 8px); z-index: 40; width: max-content;
+                    max-width: 280px; background: var(--text); color: var(--surface); font-size: 12px;
+                    font-weight: 400; line-height: 1.45; text-align: left; padding: 9px 11px; border-radius: 8px;
+                    box-shadow: 0 6px 20px rgba(0,0,0,.22); opacity: 0; visibility: hidden;
+                    transition: opacity .12s ease; pointer-events: none; white-space: normal; }
+  .infotip:hover .infotip-bubble, .infotip:focus .infotip-bubble, .infotip:focus-within .infotip-bubble {
+    opacity: 1; visibility: visible; }
   .editlink { color: var(--text-2); display: inline-flex; padding: 2px; border-radius: 4px;
               border: 0; background: none; cursor: pointer; }
   .editlink:hover { color: var(--accent); }
@@ -1009,7 +1020,7 @@ ${eventsTable}
     : `<span class="badge">${d.notConnectedBadge}</span>`;
 
   const loginDisabled = config.loginDisabled;
-  const loginToggleRow = `<span class="k">${d.loginToggleLabel}</span><span class="v">
+  const loginToggleRow = `<span class="k">${d.loginToggleLabel}<span class="infotip" tabindex="0" role="note" aria-label="${escapeHtmlAttribute(d.loginToggleHint)}">${ICON_INFO}<span class="infotip-bubble" aria-hidden="true">${escapeHtml(d.loginToggleHint)}</span></span></span><span class="v">
 <span class="toggle-wrap">
 <label class="toggle-switch">
 <input type="checkbox" id="loginToggle" role="switch" ${loginDisabled ? '' : 'checked'} aria-label="${escapeHtmlAttribute(d.loginToggleLabel)}">
@@ -1017,7 +1028,6 @@ ${eventsTable}
 </label>
 <span class="toggle-state ${loginDisabled ? 'off' : 'on'}" id="loginToggleState">${loginDisabled ? d.loginDisabledBadge : d.loginActiveBadge}</span>
 </span>
-<span class="muted" style="display:block;margin-top:6px">${d.loginToggleHint}</span>
 </span>`;
 
   // Naechste Cron-Rotation (0/6/12/18 UTC) serverseitig als ISO bestimmen;
@@ -1317,8 +1327,16 @@ ${settingsRow(
       fetch('/setup/login', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ disabled: willDisable }),
-      }).then(function (r) { return r.json(); }).then(function () { location.reload(); })
-        .catch(function () { loginToggle.disabled = false; });
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        loginToggle.disabled = false;
+        if (!res || res.ok !== true) { loginToggle.checked = !willDisable; return; }
+        // In-place aktualisieren statt Reload — der Nutzer bleibt auf den Einstellungen.
+        var state = document.getElementById('loginToggleState');
+        if (state) {
+          state.textContent = willDisable ? ${JSON.stringify(d.loginDisabledBadge)} : ${JSON.stringify(d.loginActiveBadge)};
+          state.className = 'toggle-state ' + (willDisable ? 'off' : 'on');
+        }
+      }).catch(function () { loginToggle.disabled = false; loginToggle.checked = !willDisable; });
     });
   }
   var reconnectBtn = document.getElementById('reconnectBtn');

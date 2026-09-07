@@ -300,7 +300,7 @@ every token currently out there stops working immediately. Note that a still-val
 Cloudflare Access session can then fetch a fresh token right away; rotation
 invalidates the *leaked* token, it is not a global logout.
 
-**If you need to stop everyone signing in right now.** Toggle *Editor sign-in* off
+**If you need to stop everyone signing in right now.** Toggle *CMS login* off
 under **Settings**. While disabled, `/auth/access` hands out no token at all — even
 to a valid, still-open Access session — until you enable it again. Use it for a
 planned maintenance window, or as the immediate emergency brake when rotating alone
