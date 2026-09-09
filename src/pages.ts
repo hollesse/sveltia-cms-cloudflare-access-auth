@@ -609,7 +609,10 @@ export function renderGithubRelayPage(
       return;
     }
 
-    popup = window.open(upstreamAuthUrl);
+    // 'popup' + Groesse macht daraus ein echtes Popup-Fenster statt eines
+    // Tabs — visuell wie Sveltias eigenes Auth-Popup (window.open mit
+    // Fenster-Features). Opener/Handshake bleiben identisch.
+    popup = window.open(upstreamAuthUrl, '_blank', 'popup,width=600,height=800');
 
     if (!popup) {
       showError(texts.error.popupBlocked);
