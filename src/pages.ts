@@ -570,6 +570,11 @@ export function renderGithubRelayPage(
   function finish(resultMessage) {
     if (timeoutId !== null) { window.clearTimeout(timeoutId); timeoutId = null; }
 
+    // Das Upstream-Fenster hat seine Arbeit getan — niemand sonst schliesst
+    // es (das CMS schliesst nur P, sein eigenes Popup; der Upstream-Callback
+    // schliesst sich nicht selbst).
+    if (popup && !popup.closed) { popup.close(); }
+
     var parsed = parseResult(resultMessage);
 
     if (parsed && !parsed.success) {

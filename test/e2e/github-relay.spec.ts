@@ -139,7 +139,7 @@ async function registerCommonRoutes(
   );
 }
 
-test('happy path: full double handshake delivers the token to the fake CMS, both popups close cleanly', async ({
+test('happy path: full double handshake delivers the token to the fake CMS, the upstream popup is closed by the relay', async ({
   context,
   page,
 }) => {
@@ -161,6 +161,12 @@ test('happy path: full double handshake delivers the token to the fake CMS, both
   await upstreamPopup.waitForLoadState('load');
 
   await expect(page.locator('#result')).toHaveText('token:gh-test-token-123', { timeout: 10_000 });
+
+  // The upstream callback window never closes itself and the CMS only closes
+  // its OWN popup (the relay page P) — so the relay must close the upstream
+  // window once the result arrived (src/pages.ts finish()). Without that the
+  // editor is left staring at a blank upstream tab after every login.
+  await expect.poll(() => upstreamPopup.isClosed(), { timeout: 10_000 }).toBe(true);
 });
 
 /**
@@ -203,7 +209,36 @@ const ONE_SHOT_PROBE_CMS_HTML = `<!doctype html>
 </script>
 </body></html>`;
 
-test('one-shot: a second success message from the legitimate upstream popup after handover is ignored by the relay', async ({
+/**
+ * Like `UPSTREAM_HTML`, but sends TWO success messages back-to-back in the
+ * same synchronous turn. Since the relay now CLOSES the upstream popup as
+ * soon as the first result is accepted (src/pages.ts finish()), a
+ * post-handover `upstreamPopup.evaluate(...)` can no longer drive the second
+ * message — instead both messages are queued at the relay window before the
+ * relay processes either of them, so the second one still deterministically
+ * exercises the relay's own one-shot unsubscribe.
+ */
+const UPSTREAM_DOUBLE_SEND_HTML = `<!doctype html>
+<html><body>upstream
+<script>
+(function () {
+  window.opener && window.opener.postMessage('authorizing:github', '*');
+  window.addEventListener('message', function (event) {
+    if (event.data !== 'authorizing:github') { return; }
+    window.opener.postMessage(
+      'authorization:github:success:' + JSON.stringify({ provider: 'github', token: 'gh-test-token-123' }),
+      event.origin,
+    );
+    window.opener.postMessage(
+      'authorization:github:success:' + JSON.stringify({ provider: 'github', token: 'second-token-must-be-ignored' }),
+      event.origin,
+    );
+  });
+})();
+</script>
+</body></html>`;
+
+test('one-shot: a second success message from the legitimate upstream popup is ignored by the relay', async ({
   context,
   page,
 }) => {
@@ -215,7 +250,7 @@ test('one-shot: a second success message from the legitimate upstream popup afte
     route.fulfill({ contentType: 'text/html; charset=utf-8', body: await renderRelayHtml() }),
   );
   await context.route(`${UPSTREAM_ORIGIN}/**`, (route) =>
-    route.fulfill({ contentType: 'text/html; charset=utf-8', body: UPSTREAM_HTML }),
+    route.fulfill({ contentType: 'text/html; charset=utf-8', body: UPSTREAM_DOUBLE_SEND_HTML }),
   );
 
   await page.goto(`${CMS_ORIGIN}/`);
@@ -234,22 +269,22 @@ test('one-shot: a second success message from the legitimate upstream popup afte
   await expect(page.locator('#count')).toHaveText('1');
 
   // The relay's own `onUpstreamMessage` listener removed itself right after
-  // the first success (src/pages.ts:596). The CMS fixture above keeps
-  // listening and would happily accept a second handover — so if the relay
-  // forwarded it, `#count` would tick to 2 and `#result` would flip.
+  // the first success (src/pages.ts one-shot unsubscribe). The CMS fixture
+  // above keeps listening and would happily accept a second handover — so if
+  // the relay forwarded the second (already-queued) success, `#count` would
+  // tick to 2 and `#result` would flip.
   //
-  // Wait deterministically for the relay popup's window to have actually
-  // received (and fully processed — see `installMessageProbe`) the second
-  // message before asserting the CMS state, instead of a fixed sleep.
-  const baseline = await probeCount(relayPopup);
-  await upstreamPopup.evaluate(() => {
-    window.opener?.postMessage(
-      'authorization:github:success:' +
-        JSON.stringify({ provider: 'github', token: 'second-token-must-be-ignored' }),
-      '*',
-    );
-  });
-  await waitForNextMessage(relayPopup, baseline);
+  // Deterministic sync point: the relay window receives, in order, the
+  // upstream ping (1), success #1 (2), success #2 (3) — all queued before the
+  // relay's outbound CMS handshake even starts — and the CMS's
+  // `authorizing:github` reply (4). Waiting for probe >= 4 therefore proves
+  // the second success was already fully processed (accepted or rejected)
+  // when we assert the CMS state below, without any wall-clock sleep.
+  await relayPopup.waitForFunction(
+    () => (window as unknown as { __testMessageProbeCount: number }).__testMessageProbeCount >= 4,
+    undefined,
+    { timeout: 10_000 },
+  );
   await expect(page.locator('#result')).toHaveText('token:gh-test-token-123');
   await expect(page.locator('#count')).toHaveText('1');
 });
