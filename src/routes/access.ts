@@ -69,7 +69,14 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
   }
 
   const tokenStore = env.TOKEN_STORE.get(env.TOKEN_STORE.idFromName('bot'));
-  const tokenResult = await tokenStore.getAccessToken(config.githubAppClientId);
+
+  // Login-Historie (ADR 0015): E-Mail aus dem bereits kryptografisch
+  // validierten Access-JWT. `getAccessTokenForLogin` fasst Ausgabeentscheidung
+  // und Audit-Vermerk in EINEM DO-Roundtrip zusammen (infrastructure-k2f7w) —
+  // sonst koennte eine Sperre exakt zwischen zwei getrennten Aufrufen greifen,
+  // ohne die bereits getroffene Ausgabeentscheidung noch einzuholen.
+  const email = typeof validation.payload['email'] === 'string' ? validation.payload['email'] : '';
+  const tokenResult = await tokenStore.getAccessTokenForLogin(config.githubAppClientId, email, Date.now());
 
   if (!tokenResult.ok) {
     // Reaudit R2 (auth-f2t6w): der Login-Refresh kann NACH dem obigen
@@ -87,17 +94,6 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
       config.allowedDomains,
       t,
     );
-  }
-
-  // Login-Historie vermerken (ADR 0015): E-Mail aus dem bereits kryptografisch
-  // validierten Access-JWT. Fehler hier duerfen den Login nie blockieren.
-  const email = typeof validation.payload['email'] === 'string' ? validation.payload['email'] : '';
-  if (email !== '') {
-    try {
-      await tokenStore.recordLogin(email, Date.now());
-    } catch {
-      // Audit-Log ist best-effort; ein Fehler darf die Anmeldung nicht stoppen.
-    }
   }
 
   return renderCallbackSuccessPage(

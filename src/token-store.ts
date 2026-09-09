@@ -343,8 +343,28 @@ export class TokenStore extends DurableObject<Env> {
   }
 
   /**
-   * Login-Pfad: liefert das gecachte Access-Token; refresht nur im Notfall
-   * (abgelaufen/knapp — z. B. nach verpassten Cron-Ticks).
+   * Liefert das gecachte Access-Token; refresht nur im Notfall
+   * (abgelaufen/knapp — z. B. nach verpassten Cron-Ticks). OHNE
+   * `loginDisabled`-Pruefung — das ist Sache der Aufrufer (`getAccessToken`,
+   * `getAccessTokenForLogin`), die je nach Anwendungsfall unterschiedlich
+   * weit nach dieser Aufloesung noch pruefen/verzeichnen muessen.
+   */
+  private async resolveToken(clientId: string): Promise<GetTokenResult> {
+    const [accessToken, expiresAt] = await Promise.all([
+      this.ctx.storage.get<string>('accessToken'),
+      this.ctx.storage.get<number>('expiresAt'),
+    ]);
+
+    return accessToken !== undefined &&
+      expiresAt !== undefined &&
+      expiresAt - Date.now() > MIN_REMAINING_MS
+      ? { ok: true, token: accessToken }
+      : await this.refresh(clientId);
+  }
+
+  /**
+   * Login-Pfad ohne Audit-Vermerk (Cron/Status u. Ae. nutzen diesen Pfad
+   * nicht direkt; er bleibt fuer Rueckwaertskompatibilitaet/Tests bestehen).
    *
    * Ausgabeentscheidung (Reaudit R2, auth-f2t6w): `loginDisabled` liegt als
    * Setting im SELBEN DO (`settings:v1`) und wird HIER, NACH allen Awaits
@@ -359,23 +379,56 @@ export class TokenStore extends DurableObject<Env> {
    * teilt sich der Cron-Pfad ueber `rotate`, der ungegated bleibt).
    */
   async getAccessToken(clientId: string): Promise<GetTokenResult> {
-    const [accessToken, expiresAt] = await Promise.all([
-      this.ctx.storage.get<string>('accessToken'),
-      this.ctx.storage.get<number>('expiresAt'),
-    ]);
-
-    const result: GetTokenResult =
-      accessToken !== undefined &&
-      expiresAt !== undefined &&
-      expiresAt - Date.now() > MIN_REMAINING_MS
-        ? { ok: true, token: accessToken }
-        : await this.refresh(clientId);
+    const result = await this.resolveToken(clientId);
 
     if (result.ok) {
       const settings = await this.getSettings();
 
       if (settings.loginDisabled) {
         return { ok: false, reason: 'login_disabled' };
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Login-Pfad der Route `/auth/access` (infrastructure-k2f7w): fasst die
+   * Ausgabeentscheidung UND den Audit-Vermerk (`recordLogin`, ADR 0015) in
+   * EINEM DO-Aufruf zusammen. Vorher rief die Route `getAccessToken` und
+   * `recordLogin` als zwei GETRENNTE DO-Roundtrips auf — zwischen deren
+   * Rueckkehr zum Worker und dem zweiten Aufruf konnte eine Sperre greifen,
+   * die die bereits getroffene Ausgabeentscheidung nicht mehr einholte (das
+   * Token war schon "unterwegs"). Hier gibt es zwischen der finalen
+   * `loginDisabled`-Pruefung und `recordLogin` KEINEN weiteren Await auf
+   * einen ausgehenden `fetch` (der einzige Vorgang, der das DO-Input-Gate
+   * fuer andere Aufrufe wieder oeffnet, siehe `getAccessToken` oben) — ein
+   * `updateSettings`-Aufruf eines Betreibers kann also nicht mehr zwischen
+   * Pruefung und Vermerk landen. Der Audit-Vermerk selbst bleibt best-effort
+   * (ein Fehler darf den Login nie blockieren) und wird NUR bei tatsaechlich
+   * erfolgreicher Ausgabe geschrieben (keine "erfolgreiche Anmeldung" fuer
+   * eine dann doch abgelehnte Anfrage).
+   */
+  async getAccessTokenForLogin(clientId: string, email: string, now: number): Promise<GetTokenResult> {
+    const result = await this.resolveToken(clientId);
+
+    if (!result.ok) {
+      return result;
+    }
+
+    const settings = await this.getSettings();
+
+    if (settings.loginDisabled) {
+      return { ok: false, reason: 'login_disabled' };
+    }
+
+    const trimmedEmail = email.trim();
+
+    if (trimmedEmail !== '') {
+      try {
+        await this.recordLogin(trimmedEmail, now);
+      } catch {
+        // Audit-Log ist best-effort; ein Fehler darf die Anmeldung nicht stoppen.
       }
     }
 
