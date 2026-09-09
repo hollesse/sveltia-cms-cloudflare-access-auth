@@ -451,29 +451,28 @@ export function renderAccessUnauthorizedPage(t: Texts): Response {
   return htmlResponse(page(t.lang, t.accessUnauthorized.title, body), 401);
 }
 
-/**
- * Auswahlseite (design-system-001): zwei gleichrangige Icon-Buttons,
- * GitHub zuerst, E-Mail zuletzt (direkt ueber seinem Hinweistext).
- * Query-Params (u. a. `site_id`) werden an beide Ziele durchgereicht.
- */
-export function renderSelectionPage(
-  githubAuthUrl: string,
-  emailUrl: string,
-  siteId: string | undefined,
-  t: Texts,
-): Response {
-  const body = `${eyebrow(t.eyebrow, siteId)}
-<h1>${t.selection.title}</h1>
-<a class="way way-secondary" href="${escapeHtmlAttribute(githubAuthUrl)}">${ICON_GITHUB}<span>${t.selection.github}</span></a>
-<a class="way way-secondary" href="${escapeHtmlAttribute(emailUrl)}">${ICON_MAIL}<span>${t.selection.email}</span></a>
-<p class="muted">${t.selection.hint}</p>`;
-
-  return htmlResponse(page(t.lang, t.eyebrow, body));
+/** Upstream-Delegationsdaten fuer den auf der Auswahl-Seite eingebetteten
+ * GitHub-Handshake (ADR 0017-Nachtrag: Einstiegspunkt verschoben, Relay-
+ * MECHANIK unveraendert). */
+export interface GithubDelegationConfig {
+  upstreamAuthUrl: string;
+  upstreamOrigin: string;
+  allowedDomains: string[];
+  /** Millisekunden bis zum Timeout-Fehlerpfad, wenn der Upstream stumm
+   * bleibt (Default ~5 min); als Parameter statt hartkodiert, damit der
+   * Fehlerpfad deterministisch (ohne Warten in Echtzeit) getestet werden
+   * kann. */
+  timeoutMs?: number;
 }
 
 /**
- * GitHub-Relay-Seite (ADR 0017, postMessage-Relay statt Durchreich-Proxy):
- * eigene Seite auf UNSEREM Origin, spielt zwei Rollen im Doppel-Handshake:
+ * Geteilter Handshake-Baustein (ADR 0017-Nachtrag: vormals inline in der nun
+ * entfernten `renderGithubRelayPage`, jetzt extrahiert, damit die
+ * Auswahl-Seite ihn OHNE Duplikat einbetten kann). Erwartet ein Element
+ * `#start` (Klick-Ausloeser) und `#status` (sichtbares Statusfeld) im
+ * umgebenden Markup — genau wie zuvor die eigene Relay-Seite.
+ *
+ * Rollen im Doppel-Handshake (unveraendert):
  *
  *  - Gegenueber dem Upstream-Popup (`sveltia-cms-auth`, zweiter, per Klick
  *    geoeffneter Popup auf dessen EIGENEM Origin) spielt sie die CMS-Rolle
@@ -487,26 +486,16 @@ export function renderSelectionPage(
  *    HTTPS-Origin-Allowlist, Source-Bindung, One-Shot.
  *
  * Ein Klick (User-Geste, noetig fuer Popup-aus-Popup) oeffnet das
- * Upstream-Popup; ohne `window.opener` (P selbst falsch geoeffnet) oder bei
- * geblocktem Popup gibt es einen sichtbaren, zweisprachigen Fehler statt
- * eines haengenden Fensters. Ein Timeout (~5 min) faengt einen stumm
- * bleibenden Upstream ab.
+ * Upstream-Popup; ohne `window.opener` (die Auswahl-Seite selbst falsch
+ * geoeffnet) oder bei geblocktem Popup gibt es einen sichtbaren,
+ * zweisprachigen Fehler statt eines haengenden Fensters. Ein Timeout
+ * (~5 min) faengt einen stumm bleibenden Upstream ab.
  */
-export function renderGithubRelayPage(
-  upstreamAuthUrl: string,
-  upstreamOrigin: string,
-  siteId: string | undefined,
-  allowedDomains: string[],
-  t: Texts,
-  /** Millisekunden bis zum Timeout-Fehlerpfad, wenn der Upstream stumm
-   * bleibt (Default ~5 min); als Parameter statt hartkodiert, damit der
-   * Fehlerpfad deterministisch (ohne Warten in Echtzeit) getestet werden
-   * kann. */
-  timeoutMs = 5 * 60 * 1000,
-): Response {
+function githubHandshakeScript(delegation: GithubDelegationConfig, t: Texts): string {
   const r = t.relay;
+  const { upstreamAuthUrl, upstreamOrigin, allowedDomains, timeoutMs = 5 * 60 * 1000 } = delegation;
 
-  const script = `(function () {
+  return `(function () {
   var upstreamAuthUrl = ${scriptJson(upstreamAuthUrl)};
   var upstreamOrigin = ${scriptJson(upstreamOrigin)};
   var allowedOrigins = ${scriptJson(buildAllowedOrigins(allowedDomains))};
@@ -628,15 +617,37 @@ export function renderGithubRelayPage(
     }, ${scriptJson(timeoutMs)});
   });
 })();`;
+}
+
+/**
+ * Auswahlseite (design-system-001): zwei gleichrangige Icon-Buttons,
+ * GitHub zuerst, E-Mail zuletzt (direkt ueber seinem Hinweistext).
+ * Query-Params (u. a. `site_id`) werden an beide Ziele durchgereicht.
+ *
+ * Ein-Klick-GitHub-Login (ADR 0017-Nachtrag, Einstiegspunkt verschoben): der
+ * GitHub-Weg ist ein Button statt eines Links und bettet direkt den
+ * geteilten Handshake-Baustein (`githubHandshakeScript`) ein — ein Klick
+ * oeffnet das Upstream-Popup synchron im Klick-Handler (User-Geste) und
+ * faehrt den Doppel-Handshake, ohne ueber eine eigene Zwischenseite zu
+ * navigieren. Die separate `/auth/github`-Route entfaellt damit.
+ */
+export function renderSelectionPage(
+  githubDelegation: GithubDelegationConfig,
+  emailUrl: string,
+  siteId: string | undefined,
+  t: Texts,
+): Response {
+  const script = githubHandshakeScript(githubDelegation, t);
 
   const body = `${eyebrow(t.eyebrow, siteId)}
-<h1>${r.title}</h1>
-<p>${r.intro}</p>
-<button class="way way-primary" id="start">${ICON_GITHUB}<span>${r.button}</span></button>
+<h1>${t.selection.title}</h1>
+<button class="way way-secondary" id="start">${ICON_GITHUB}<span>${t.selection.github}</span></button>
 <p id="status" class="muted" hidden></p>
+<a class="way way-secondary" href="${escapeHtmlAttribute(emailUrl)}">${ICON_MAIL}<span>${t.selection.email}</span></a>
+<p class="muted">${t.selection.hint}</p>
 <script>${script}</script>`;
 
-  return htmlResponse(page(t.lang, r.title, body));
+  return htmlResponse(page(t.lang, t.eyebrow, body));
 }
 
 interface CallbackSuccessPayload {

@@ -66,11 +66,15 @@ describe('Env-Fallback vs. explicit disable', () => {
     const effective = buildLoadedConfig(ANCHORS, await bot().getSettings(), testEnv);
     expect(effective.githubAuthUrl).toBeUndefined();
 
-    // Der Proxy-Einstieg ist damit wirklich aus.
-    const proxy = await SELF.fetch(`${ORIGIN}/auth/github?site_id=cms.example.com`, {
+    // Der GitHub-Weg ist damit wirklich aus: `/auth` zeigt keine Auswahl mehr
+    // an, sondern geht direkt zum E-Mail-Weg durch (ADR 0017-Nachtrag: der
+    // Handshake ist jetzt in der Auswahl-Seite eingebettet, es gibt keine
+    // separate `/auth/github`-Route mehr, die man einzeln abfragen koennte).
+    const auth = await SELF.fetch(`${ORIGIN}/auth?site_id=cms.example.com`, {
       redirect: 'manual',
     });
-    expect(proxy.status).toBe(404);
+    expect(auth.status).toBe(302);
+    expect(auth.headers.get('location')).toContain('/auth/access');
   });
 
   it('re-enables the proxy when a valid URL is set again', async () => {
@@ -87,5 +91,10 @@ describe('Env-Fallback vs. explicit disable', () => {
 
     const effective = buildLoadedConfig(ANCHORS, await bot().getSettings(), testEnv);
     expect(effective.githubAuthUrl).toBe('https://other-auth.example.net');
+
+    const auth = await SELF.fetch(`${ORIGIN}/auth?site_id=cms.example.com`);
+    expect(auth.status).toBe(200);
+    const body = await auth.text();
+    expect(body).toContain('other-auth.example.net/auth?site_id=cms.example.com&provider=github');
   });
 });

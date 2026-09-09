@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../../src/types.js';
 
 /**
- * ADR 0017: `/auth/github` liefert eine EIGENE Relay-Seite statt fremdes
- * Upstream-HTML durchzureichen; `/callback` existiert nicht mehr. Der
- * eigentliche Doppel-Handshake (Popup-aus-Popup) wird in
- * `test/e2e/github-relay.spec.ts` mit echtem Chromium geprueft — hier nur
- * Routen-Ebene: richtige Seite, richtige Header, kein Upstream-Kontakt.
+ * ADR 0017-Nachtrag (infrastructure-m4v9k): der Ein-Klick-GitHub-Login laeuft
+ * jetzt vollstaendig auf der Auswahl-Seite (`GET /auth`) — die separate
+ * `/auth/github`-Zwischenseite (`handleGithubRelay`, `renderGithubRelayPage`)
+ * ist entfernt. `/auth/github` ist daher unabhaengig von der Konfiguration
+ * 404. Der eigentliche Doppel-Handshake wird jetzt ab dem Auswahl-Screen in
+ * `test/e2e/github-relay.spec.ts` mit echtem Chromium geprueft; das
+ * `site_id`-Gate an der Auswahl-Route in `test/routes/relay-site-id.spec.ts`.
  */
 const testEnv = env as unknown as Env;
 
@@ -30,60 +32,20 @@ afterEach(() => {
   Object.assign(testEnv, originalEnv);
 });
 
-describe('GET /auth/github (postMessage relay, ADR 0017)', () => {
-  it('renders our own relay page for an allowed site_id — no upstream redirect, no upstream contact', async () => {
+describe('GET /auth/github (removed, ADR 0017-Nachtrag: Ein-Klick-Login auf der Auswahl-Seite)', () => {
+  it('is 404 even though GitHub delegation is fully configured', async () => {
     const response = await SELF.fetch(
       'https://worker.example.com/auth/github?site_id=cms.example.com',
       { redirect: 'manual' },
     );
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toContain('text/html');
-
-    const body = await response.text();
-
-    // Eigenes Markup, kein durchgereichtes Upstream-HTML.
-    expect(body).toContain('id="start"');
-    expect(body).not.toContain('unhandled mock request');
+    expect(response.status).toBe(404);
   });
 
-  it('carries the full security headers including CSP (own page, unlike the former pass-through)', async () => {
-    const response = await SELF.fetch(
-      'https://worker.example.com/auth/github?site_id=cms.example.com',
-    );
-
-    expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
-    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
-    expect(response.headers.get('x-frame-options')).toBe('DENY');
-    expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
-  });
-
-  it('embeds the upstream origin and the upstream /auth URL with provider=github and site_id preserved', async () => {
-    const response = await SELF.fetch(
-      'https://worker.example.com/auth/github?site_id=cms.example.com',
-    );
-    const body = await response.text();
-
-    expect(body).toContain('"https://sveltia-cms-auth.example.net"');
-    expect(body).toContain('sveltia-cms-auth.example.net/auth?site_id=cms.example.com&provider=github');
-  });
-
-  it('embeds the exact configured handover origin for the final CMS handover, like the callback pages', async () => {
-    const response = await SELF.fetch(
-      'https://worker.example.com/auth/github?site_id=cms.example.com',
-    );
-    const body = await response.text();
-
-    expect(body).toContain('"https://cms.example.com"');
-  });
-
-  it('returns 404 when GITHUB_AUTH_URL is unset (delegation not configured)', async () => {
-    testEnv.GITHUB_AUTH_URL = '';
-
-    const response = await SELF.fetch(
-      'https://worker.example.com/auth/github?site_id=cms.example.com',
-    );
+  it('is 404 with no site_id at all', async () => {
+    const response = await SELF.fetch('https://worker.example.com/auth/github', {
+      redirect: 'manual',
+    });
 
     expect(response.status).toBe(404);
   });

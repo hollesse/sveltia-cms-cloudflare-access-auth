@@ -1,9 +1,7 @@
-import { isAllowedDomain, loadConfig } from './config.js';
+import { loadConfig } from './config.js';
 import { handleAuthAccess } from './routes/access.js';
 import { handleAuth } from './routes/auth.js';
-import { handleGithubRelay } from './routes/github-relay.js';
 import { handleSetup } from './routes/setup.js';
-import { pickTexts } from './texts.js';
 import type { Env } from './types.js';
 
 export { TokenStore } from './token-store.js';
@@ -30,32 +28,6 @@ export default {
         return request.method === 'GET'
           ? handleAuthAccess(request, env)
           : methodNotAllowed(['GET']);
-
-      case '/auth/github': {
-        if (request.method !== 'GET') {
-          return methodNotAllowed(['GET']);
-        }
-
-        const config = await loadConfig(env);
-
-        // Offenes-Relay-Schutz (ADR 0014): ohne mindestens eine erlaubte
-        // Domain bleibt der GitHub-Weg gesperrt.
-        if (!config.ok || config.allowedDomains.length === 0) {
-          return new Response('Not Found', { status: 404 });
-        }
-
-        // Eingangs-Gate: `site_id` muss eine erlaubte Domain sein, bevor
-        // irgendetwas nach aussen geht (wie `/auth`).
-        const siteId = new URL(request.url).searchParams.get('site_id') ?? '';
-
-        if (!isAllowedDomain(siteId, config.allowedDomains)) {
-          return new Response('Not Found', { status: 404 });
-        }
-
-        const t = pickTexts(request.headers.get('accept-language'));
-
-        return handleGithubRelay(request, config, t);
-      }
 
       default:
         return new Response('Not Found', { status: 404 });

@@ -40,14 +40,18 @@ describe('GET /auth', () => {
     expect(location).toContain('site_id=cms.example.com');
   });
 
-  it('shows a selection page with both actions when GITHUB_AUTH_URL is set', async () => {
+  it('shows a selection page with both actions when GITHUB_AUTH_URL is set (Ein-Klick-Login, ADR 0017-Nachtrag)', async () => {
     testEnv.GITHUB_AUTH_URL = 'https://sveltia-cms-auth.example.net/auth';
 
     const response = await SELF.fetch('https://worker.example.com/auth?site_id=cms.example.com');
 
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(body).toContain('/auth/github?');
+    // Kein Link mehr auf eine eigene /auth/github-Zwischenseite — der
+    // Handshake ist direkt eingebettet (Ein-Klick-Login).
+    expect(body).not.toContain('/auth/github');
+    expect(body).toContain('id="start"');
+    expect(body).toContain('sveltia-cms-auth.example.net/auth?site_id=cms.example.com&provider=github');
     expect(body).toContain('/auth/access');
   });
 

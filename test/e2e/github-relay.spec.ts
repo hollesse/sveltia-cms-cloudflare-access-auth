@@ -2,14 +2,18 @@ import { test, expect } from '@playwright/test';
 import { loadPagesModule } from './render-pages.mjs';
 
 /**
- * Zwei-Origin-Handshake des GitHub-Relays (ADR 0017) in echtem Chromium.
- * Drei simulierte Origins per `context.route` (nicht nur `page.route` — die
- * Popup-Fenster muessen die Interception erben, s. Task-Notes):
+ * Zwei-Origin-Handshake des GitHub-Delegations-Flows (ADR 0017 +
+ * ADR-0017-Nachtrag infrastructure-m4v9k: Ein-Klick-Login, Handshake jetzt in
+ * der Auswahl-Seite statt einer eigenen `/auth/github`-Zwischenseite) in
+ * echtem Chromium. Drei simulierte Origins per `context.route` (nicht nur
+ * `page.route` — die Popup-Fenster muessen die Interception erben, s.
+ * Task-Notes):
  *
  *  - `https://cms.test`     — Fake-CMS, reproduziert Sveltias `authorize()`
  *                             (Handler prueft `event.origin` strikt gegen den
- *                             Relay-Origin).
- *  - `https://worker.test`  — unsere Relay-Seite (`renderGithubRelayPage`).
+ *                             Auswahl-Seiten-Origin).
+ *  - `https://worker.test`  — unsere Auswahl-Seite (`renderSelectionPage`,
+ *                             die den geteilten Handshake-Baustein einbettet).
  *  - `https://upstream.test` — Stub des `sveltia-cms-auth`-Upstreams,
  *                             reproduziert dessen `outputHTML`-Handshake-Skript
  *                             (Research zwei-origin-handshake-optionen-2026-09-04).
@@ -26,13 +30,16 @@ async function renderRelayHtml(overrides: {
 } = {}): Promise<string> {
   const p = await loadPagesModule();
   const t = p.pickTexts('en');
-  const response = p.renderGithubRelayPage(
-    overrides.upstreamAuthUrl ?? `${UPSTREAM_ORIGIN}/auth?site_id=cms.test&provider=github`,
-    overrides.upstreamOrigin ?? UPSTREAM_ORIGIN,
+  const response = p.renderSelectionPage(
+    {
+      upstreamAuthUrl: overrides.upstreamAuthUrl ?? `${UPSTREAM_ORIGIN}/auth?site_id=cms.test&provider=github`,
+      upstreamOrigin: overrides.upstreamOrigin ?? UPSTREAM_ORIGIN,
+      allowedDomains: ['cms.test'],
+      timeoutMs: overrides.timeoutMs,
+    },
+    `${RELAY_ORIGIN}/auth/access?site_id=cms.test`,
     'cms.test',
-    ['cms.test'],
     t,
-    overrides.timeoutMs,
   );
 
   return response.text();
@@ -48,7 +55,7 @@ const CMS_HTML = `<!doctype html>
   var authOrigin = ${JSON.stringify(RELAY_ORIGIN)};
   var popup;
   document.getElementById('startGithub').addEventListener('click', function () {
-    popup = window.open('${RELAY_ORIGIN}/auth/github?site_id=cms.test');
+    popup = window.open('${RELAY_ORIGIN}/auth?site_id=cms.test');
     window.addEventListener('message', function handler(event) {
       if (event.origin !== authOrigin || typeof event.data !== 'string') { return; }
       if (event.data === 'authorizing:github') {
@@ -190,7 +197,7 @@ const ONE_SHOT_PROBE_CMS_HTML = `<!doctype html>
   var authOrigin = ${JSON.stringify(RELAY_ORIGIN)};
   var count = 0;
   document.getElementById('startGithub').addEventListener('click', function () {
-    window.open('${RELAY_ORIGIN}/auth/github?site_id=cms.test');
+    window.open('${RELAY_ORIGIN}/auth?site_id=cms.test');
     window.addEventListener('message', function (event) {
       if (event.origin !== authOrigin || typeof event.data !== 'string') { return; }
       if (event.data === 'authorizing:github') {
@@ -498,7 +505,7 @@ test('missing opener: navigating to the relay page directly (no window.opener) s
   await registerCommonRoutes(context);
 
   // Opened directly (address bar / bookmark), not as a popup — no window.opener.
-  await page.goto(`${RELAY_ORIGIN}/auth/github?site_id=cms.test`);
+  await page.goto(`${RELAY_ORIGIN}/auth?site_id=cms.test`);
   await page.locator('#start').click();
 
   await expect(page.locator('#status')).toBeVisible();
