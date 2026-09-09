@@ -74,14 +74,30 @@ export async function validateAccessJwt(
 }
 
 /** Liest den `aud`-Claim als einzelnen String (Cloudflare Access setzt ihn
- * i.d.R. als String; `jose` typisiert ihn dennoch als `string | string[]`). */
-export function extractAud(aud: string | string[] | undefined): string | undefined {
+ * i.d.R. als String; `jose` typisiert ihn dennoch als `string | string[]`).
+ *
+ * Array-tauglich (nicht nur `aud[0]`): ist `expectedAud` angegeben und in
+ * einem `aud`-Array enthalten — unabhaengig von seiner Position —, wird
+ * `expectedAud` zurueckgegeben, sodass Aufrufer die konfigurierte AUD auch
+ * dann korrekt matchen, wenn sie nicht an erster Stelle steht. Andernfalls
+ * (kein `expectedAud`, oder nicht enthalten) faellt die Funktion auf den
+ * bisherigen Anzeige-/Pinning-Wert `aud[0]` zurueck. */
+export function extractAud(
+  aud: string | string[] | undefined,
+  expectedAud?: string,
+): string | undefined {
   if (typeof aud === 'string') {
     return aud;
   }
 
-  if (Array.isArray(aud) && aud.length > 0 && typeof aud[0] === 'string') {
-    return aud[0];
+  if (Array.isArray(aud)) {
+    if (expectedAud !== undefined && aud.includes(expectedAud)) {
+      return expectedAud;
+    }
+
+    if (aud.length > 0 && typeof aud[0] === 'string') {
+      return aud[0];
+    }
   }
 
   return undefined;

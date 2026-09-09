@@ -138,4 +138,19 @@ describe('extractAud', () => {
     expect(extractAud([])).toBeUndefined();
     expect(extractAud(undefined)).toBeUndefined();
   });
+
+  describe('matching against an expected AUD (array-tolerant)', () => {
+    it('matches an aud array where the expected AUD is NOT at position 0', () => {
+      expect(extractAud(['other-aud', 'expected-aud'], 'expected-aud')).toBe('expected-aud');
+    });
+
+    it('does not match an aud array that lacks the expected AUD', () => {
+      expect(extractAud(['other-aud', 'another-aud'], 'expected-aud')).not.toBe('expected-aud');
+    });
+
+    it('still matches a single string aud (regression)', () => {
+      expect(extractAud('expected-aud', 'expected-aud')).toBe('expected-aud');
+      expect(extractAud('other-aud', 'expected-aud')).not.toBe('expected-aud');
+    });
+  });
 });

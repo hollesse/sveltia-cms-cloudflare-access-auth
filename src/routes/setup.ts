@@ -261,7 +261,7 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
   const tokenStore = env.TOKEN_STORE.get(env.TOKEN_STORE.idFromName('bot'));
   const settings = await tokenStore.getSettings();
   const pinnedAud = firstNonBlank(settings.accessAppAud, env.ACCESS_APP_AUD);
-  const presentedAud = extractAud(tofu.payload.aud);
+  const presentedAud = extractAud(tofu.payload.aud, pinnedAud);
 
   // AUD-Pinning erzwingen, sobald bekannt (auch fuer Setup-Routen selbst).
   if (pinnedAud !== undefined && presentedAud !== pinnedAud) {
