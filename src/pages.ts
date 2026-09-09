@@ -262,7 +262,7 @@ ${footerHtml(lang)}
  * nicht cachebar (Tokens/E-Mails), kein MIME-Sniffing, kein Referrer-Leak,
  * nicht einbettbar per X-Frame-Options + CSP (Clickjacking-Schutz).
  */
-const SECURITY_HEADERS: Record<string, string> = {
+export const SECURITY_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',

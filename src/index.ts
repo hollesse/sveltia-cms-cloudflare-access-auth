@@ -1,4 +1,5 @@
 import { loadConfig } from './config.js';
+import { SECURITY_HEADERS } from './pages.js';
 import { handleAuthAccess } from './routes/access.js';
 import { handleAuth } from './routes/auth.js';
 import { handleSetup } from './routes/setup.js';
@@ -30,7 +31,7 @@ export default {
           : methodNotAllowed(['GET']);
 
       default:
-        return new Response('Not Found', { status: 404 });
+        return new Response('Not Found', { status: 404, headers: SECURITY_HEADERS });
     }
   },
 

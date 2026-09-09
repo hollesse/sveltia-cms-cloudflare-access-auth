@@ -77,4 +77,15 @@ describe('Security response headers', () => {
 
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
+
+  it('sets the full security headers on the router 404 fallthrough', async () => {
+    const response = await SELF.fetch(`${ORIGIN}/nonexistent-route`);
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+  });
 });
