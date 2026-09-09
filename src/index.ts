@@ -1,8 +1,9 @@
 import { isAllowedDomain, loadConfig } from './config.js';
 import { handleAuthAccess } from './routes/access.js';
 import { handleAuth } from './routes/auth.js';
-import { handleGithubProxy } from './routes/github-proxy.js';
+import { handleGithubRelay } from './routes/github-relay.js';
 import { handleSetup } from './routes/setup.js';
+import { pickTexts } from './texts.js';
 import type { Env } from './types.js';
 
 export { TokenStore } from './token-store.js';
@@ -30,8 +31,7 @@ export default {
           ? handleAuthAccess(request, env)
           : methodNotAllowed(['GET']);
 
-      case '/auth/github':
-      case '/callback': {
+      case '/auth/github': {
         if (request.method !== 'GET') {
           return methodNotAllowed(['GET']);
         }
@@ -39,25 +39,22 @@ export default {
         const config = await loadConfig(env);
 
         // Offenes-Relay-Schutz (ADR 0014): ohne mindestens eine erlaubte
-        // Domain bleibt der GitHub-Proxy gesperrt — gleiches Verhalten wie
-        // vor der Settings-im-DO-Umstellung (no_allowed_domains -> 404).
+        // Domain bleibt der GitHub-Weg gesperrt.
         if (!config.ok || config.allowedDomains.length === 0) {
           return new Response('Not Found', { status: 404 });
         }
 
-        // Eingangs-Gate am Einstieg: `site_id` muss eine erlaubte Domain sein,
-        // bevor irgendetwas nach aussen geht (wie `/auth`). Nur am `/auth/github`-
-        // Einstieg — der `/callback` traegt keinen vertrauenswuerdigen `site_id`
-        // (GitHub kontrolliert den Redirect) und bleibt am Upstream-Origin-Check.
-        if (pathname === '/auth/github') {
-          const siteId = new URL(request.url).searchParams.get('site_id') ?? '';
+        // Eingangs-Gate: `site_id` muss eine erlaubte Domain sein, bevor
+        // irgendetwas nach aussen geht (wie `/auth`).
+        const siteId = new URL(request.url).searchParams.get('site_id') ?? '';
 
-          if (!isAllowedDomain(siteId, config.allowedDomains)) {
-            return new Response('Not Found', { status: 404 });
-          }
+        if (!isAllowedDomain(siteId, config.allowedDomains)) {
+          return new Response('Not Found', { status: 404 });
         }
 
-        return handleGithubProxy(request, config);
+        const t = pickTexts(request.headers.get('accept-language'));
+
+        return handleGithubRelay(request, config, t);
       }
 
       default:

@@ -41,8 +41,9 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
   url.searchParams.forEach((value, key) => accessUrl.searchParams.set(key, value));
 
   if (config.githubAuthUrl) {
-    // GitHub-Button zeigt auf UNSEREN Proxy-Einstieg (Option C, ADR 0001/§7.6):
-    // gleicher Origin fuer OAuth-Start, Callback und postMessage.
+    // GitHub-Button zeigt auf UNSEREN Relay-Einstieg (ADR 0001/0017): eine
+    // eigene Seite auf unserem Origin, die den Upstream als zweites Popup
+    // auf DESSEN Origin oeffnet statt fremdes HTML durchzureichen.
     const githubUrl = new URL('/auth/github', url.origin);
     url.searchParams.forEach((value, key) => githubUrl.searchParams.set(key, value));
 

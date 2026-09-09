@@ -256,27 +256,40 @@ code, and are signed in.
 ## Optional: keep GitHub sign-in via sveltia-cms-auth
 
 If some editors prefer their personal GitHub account, the worker can delegate
-that path to an existing `sveltia-cms-auth` deployment (it proxies the OAuth
-round-trip so the CMS's origin checks stay happy):
+that path to a `sveltia-cms-auth` deployment. Since ADR 0017, this runs as a
+**postMessage relay** (§7.6 option B), not a pass-through proxy: `/auth/github`
+is the worker's own page. A click opens `sveltia-cms-auth` in a *second* popup
+on its own origin, and only postMessage *data* — never HTML or script — crosses
+back to the worker's origin. Set up both configuration steps together, at
+deploy time — the GitHub sign-in path is broken between step 1 and step 2:
 
 1. Set `GITHUB_AUTH_URL` (secret) to the `sveltia-cms-auth` base URL. This
-   enables the selection page with both buttons.
-2. Change the **callback URL of that deployment's GitHub OAuth App** to
-   `https://<this worker>/callback`. ⚠️ OAuth Apps have a *single* callback
-   URL — after this, logins that go directly to `sveltia-cms-auth` (without
-   this worker) stop working for that OAuth App.
+   enables the selection page with both buttons, and switches the GitHub
+   button on to the relay page.
+2. Change the **callback URL of that `sveltia-cms-auth` deployment's GitHub
+   OAuth App** back to `https://<that deployment>/callback` (its own origin —
+   *not* this worker). ⚠️ OAuth Apps have a *single* callback URL.
 3. Make sure the `sveltia-cms-auth` deployment's own `ALLOWED_DOMAINS`
-   includes your site's domain.
+   includes **both**: your CMS site's domain(s) (checked against the
+   `site_id` query parameter it receives, "gate 1") **and** this worker's
+   host (checked against the relay popup's origin when it receives the
+   result, "gate 2"). If that deployment leaves `ALLOWED_DOMAINS` empty, both
+   gates are skipped — fine for a self-hosted instance you already trust, not
+   recommended for anything shared.
 
-**Security note (delegated trust).** This worker proxies the OAuth round-trip on
-its own origin — the same origin as `/setup`. The `sveltia-cms-auth` deployment you
-point to therefore runs inside your admin origin's trust boundary. The worker only
-ever forwards the `csrf-token` cookie in either direction, so your Cloudflare Access
-identity (`CF_Authorization`) is never exposed to it and it cannot set cookies in
-your origin — but a compromised or XSS-affected upstream could still act within the
-admin origin. Treat that deployment as trusted as this worker itself: run your own
-instance and keep it updated. If you need stronger isolation, host the admin area on
-a separate origin.
+**Security note (delegated trust, narrowed by ADR 0017).** No upstream HTML or
+script ever runs on this worker's origin anymore — a compromised
+`sveltia-cms-auth` deployment can at most send bad *data* through the relay,
+which is still gated by the exact-origin token handover used everywhere else
+in this project. Treat the deployment as you would any code you delegate to:
+run your own instance and keep it updated.
+
+**Protocol coupling.** The relay page reproduces `sveltia-cms-auth`'s
+postMessage handshake (`authorizing:<provider>` ping/reply, then
+`authorization:<provider>:success:…` / `:error:…`) as read from its `main`
+branch source on 2026-09-04. An upstream protocol change could break the
+relay; if GitHub sign-in stops working after updating your `sveltia-cms-auth`
+deployment, check whether its handshake messages changed.
 
 ## Running the service day to day
 

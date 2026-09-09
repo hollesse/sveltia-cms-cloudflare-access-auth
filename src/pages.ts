@@ -256,27 +256,17 @@ ${footerHtml(lang)}
 </html>`;
 
 /**
- * Security-Header, die JEDE Antwort des Workers tragen muss — auch die
- * durchgereichten Antworten des GitHub-Delegations-Proxys (`github-proxy.ts`,
- * R4-Haertung): nicht cachebar (Tokens/E-Mails), kein MIME-Sniffing, kein
- * Referrer-Leak, nicht einbettbar per X-Frame-Options. Exportiert, damit der
- * Proxy diese Werte teilt statt dupliziert.
+ * Security-Header, die JEDE vom Worker gerenderte Seite tragen muss (ADR 0017:
+ * seit der Umstellung auf das postMessage-Relay laeuft nie fremdes
+ * Upstream-HTML mehr auf unserem Origin — jede Antwort ist eigenes Markup):
+ * nicht cachebar (Tokens/E-Mails), kein MIME-Sniffing, kein Referrer-Leak,
+ * nicht einbettbar per X-Frame-Options + CSP (Clickjacking-Schutz).
  */
-export const PROXY_SECURITY_HEADERS: Record<string, string> = {
+const SECURITY_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY',
-};
-
-/**
- * Security-Header fuer alle vom Worker gerenderten Seiten: ergaenzt
- * `PROXY_SECURITY_HEADERS` um eine CSP (Clickjacking-Schutz). Die CSP bleibt
- * bewusst auf den eigenen Seiten beschraenkt — auf durchgereichten
- * Proxy-Antworten waere sie wertlos, s. `github-proxy.ts`.
- */
-const SECURITY_HEADERS: Record<string, string> = {
-  ...PROXY_SECURITY_HEADERS,
   'content-security-policy': "frame-ancestors 'none'",
 };
 
@@ -479,6 +469,166 @@ export function renderSelectionPage(
 <p class="muted">${t.selection.hint}</p>`;
 
   return htmlResponse(page(t.lang, t.eyebrow, body));
+}
+
+/**
+ * GitHub-Relay-Seite (ADR 0017, postMessage-Relay statt Durchreich-Proxy):
+ * eigene Seite auf UNSEREM Origin, spielt zwei Rollen im Doppel-Handshake:
+ *
+ *  - Gegenueber dem Upstream-Popup (`sveltia-cms-auth`, zweiter, per Klick
+ *    geoeffneter Popup auf dessen EIGENEM Origin) spielt sie die CMS-Rolle
+ *    aus dem Sveltia-Handshake nach (Research zwei-origin-handshake): nimmt
+ *    `authorizing:github` entgegen, antwortet, akzeptiert danach genau EINE
+ *    `authorization:github:success:…`/`:error:…`-Nachricht — nur vom
+ *    konfigurierten Upstream-Origin UND vom selbst geoeffneten Fenster.
+ *  - Gegenueber dem echten CMS (`window.opener`) spielt sie die Rolle des
+ *    Auth-Servers aus der bestehenden, gehaerteten Handover-Mechanik
+ *    (`renderCallbackSuccessPage`/`renderCallbackErrorPage`): exakte
+ *    HTTPS-Origin-Allowlist, Source-Bindung, One-Shot.
+ *
+ * Ein Klick (User-Geste, noetig fuer Popup-aus-Popup) oeffnet das
+ * Upstream-Popup; ohne `window.opener` (P selbst falsch geoeffnet) oder bei
+ * geblocktem Popup gibt es einen sichtbaren, zweisprachigen Fehler statt
+ * eines haengenden Fensters. Ein Timeout (~5 min) faengt einen stumm
+ * bleibenden Upstream ab.
+ */
+export function renderGithubRelayPage(
+  upstreamAuthUrl: string,
+  upstreamOrigin: string,
+  siteId: string | undefined,
+  allowedDomains: string[],
+  t: Texts,
+  /** Millisekunden bis zum Timeout-Fehlerpfad, wenn der Upstream stumm
+   * bleibt (Default ~5 min); als Parameter statt hartkodiert, damit der
+   * Fehlerpfad deterministisch (ohne Warten in Echtzeit) getestet werden
+   * kann. */
+  timeoutMs = 5 * 60 * 1000,
+): Response {
+  const r = t.relay;
+
+  const script = `(function () {
+  var upstreamAuthUrl = ${scriptJson(upstreamAuthUrl)};
+  var upstreamOrigin = ${scriptJson(upstreamOrigin)};
+  var allowedOrigins = ${scriptJson(buildAllowedOrigins(allowedDomains))};
+  var texts = ${scriptJson(r)};
+
+  var startBtn = document.getElementById('start');
+  var statusEl = document.getElementById('status');
+  var popup = null;
+  var timeoutId = null;
+
+  function setStatus(message) {
+    statusEl.textContent = message;
+    statusEl.hidden = false;
+  }
+
+  function showError(message) {
+    if (timeoutId !== null) { window.clearTimeout(timeoutId); timeoutId = null; }
+    // '.way' authors a 'display: flex' rule that would otherwise beat the
+    // UA '[hidden] { display: none }' default — set display explicitly.
+    startBtn.style.display = 'none';
+    setStatus(message);
+  }
+
+  /** Parst 'authorization:github:success:{...}' / ':error:{...}' — liefert
+   * null bei unbekanntem Format statt einer Exception. */
+  function parseResult(resultMessage) {
+    var successPrefix = 'authorization:github:success:';
+    var errorPrefix = 'authorization:github:error:';
+    var isSuccess = resultMessage.indexOf(successPrefix) === 0;
+    var prefix = isSuccess ? successPrefix : errorPrefix;
+
+    if (!isSuccess && resultMessage.indexOf(errorPrefix) !== 0) { return null; }
+
+    try {
+      return { success: isSuccess, payload: JSON.parse(resultMessage.slice(prefix.length)) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Reicht das Ergebnis an das echte CMS weiter — exakt der bestehende
+   * gehaertete Handover (siehe renderCallbackSuccessPage/ErrorPage). */
+  function sendToCms(resultMessage) {
+    if (!window.opener) {
+      showError(texts.error.noOpener);
+      return;
+    }
+
+    function receiveFromCms(event) {
+      if (event.source !== window.opener) { return; }
+      if (event.data !== 'authorizing:github') { return; }
+      if (allowedOrigins.indexOf(event.origin) === -1) { return; }
+      window.removeEventListener('message', receiveFromCms, false);
+      window.opener.postMessage(resultMessage, event.origin);
+    }
+
+    window.addEventListener('message', receiveFromCms, false);
+    window.opener.postMessage('authorizing:github', '*');
+  }
+
+  function finish(resultMessage) {
+    if (timeoutId !== null) { window.clearTimeout(timeoutId); timeoutId = null; }
+
+    var parsed = parseResult(resultMessage);
+
+    if (parsed && !parsed.success) {
+      setStatus((parsed.payload && parsed.payload.error) || texts.error.upstreamFailed);
+    } else {
+      setStatus(texts.status.signingIn);
+    }
+
+    sendToCms(resultMessage);
+  }
+
+  function onUpstreamMessage(event) {
+    if (event.origin !== upstreamOrigin) { return; }
+    if (event.source !== popup) { return; }
+    if (typeof event.data !== 'string') { return; }
+
+    if (event.data === 'authorizing:github') {
+      event.source.postMessage('authorizing:github', upstreamOrigin);
+      return;
+    }
+
+    if (event.data.indexOf('authorization:github:success:') === 0 ||
+        event.data.indexOf('authorization:github:error:') === 0) {
+      window.removeEventListener('message', onUpstreamMessage, false);
+      finish(event.data);
+    }
+  }
+
+  startBtn.addEventListener('click', function () {
+    if (!window.opener) {
+      showError(texts.error.noOpener);
+      return;
+    }
+
+    popup = window.open(upstreamAuthUrl);
+
+    if (!popup) {
+      showError(texts.error.popupBlocked);
+      return;
+    }
+
+    startBtn.disabled = true;
+    setStatus(texts.status.waiting);
+    window.addEventListener('message', onUpstreamMessage, false);
+    timeoutId = window.setTimeout(function () {
+      window.removeEventListener('message', onUpstreamMessage, false);
+      finish('authorization:github:error:' + JSON.stringify({ provider: 'github', error: texts.error.timeout }));
+    }, ${scriptJson(timeoutMs)});
+  });
+})();`;
+
+  const body = `${eyebrow(t.eyebrow, siteId)}
+<h1>${r.title}</h1>
+<p>${r.intro}</p>
+<button class="way way-primary" id="start">${ICON_GITHUB}<span>${r.button}</span></button>
+<p id="status" class="muted" hidden></p>
+<script>${script}</script>`;
+
+  return htmlResponse(page(t.lang, r.title, body));
 }
 
 interface CallbackSuccessPayload {

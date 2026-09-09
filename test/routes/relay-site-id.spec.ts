@@ -3,11 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Env } from '../../src/types.js';
 
 /**
- * Der GitHub-Delegations-Proxy soll am Einstieg `/auth/github` den `site_id`
- * gegen `ALLOWED_DOMAINS` prüfen (wie `/auth`), bevor irgendetwas nach außen
- * geht — statt jeden `site_id` durchzureichen. `/callback` traegt keinen
- * vertrauenswuerdigen site_id (GitHub kontrolliert den Redirect) und bleibt
- * daher am Upstream-Origin-Check gebunden.
+ * Der GitHub-Relay-Einstieg (ADR 0017) prueft `site_id` gegen `ALLOWED_DOMAINS`
+ * (wie `/auth`), bevor irgendetwas nach aussen geht — das Gate selbst ist
+ * unveraendert aus dem vormaligen Proxy uebernommen, nur die Erfolgsantwort
+ * ist jetzt die eigene Relay-Seite statt eines 302 auf den Upstream.
  */
 const testEnv = env as unknown as Env;
 
@@ -30,7 +29,7 @@ afterEach(() => {
   Object.assign(testEnv, originalEnv);
 });
 
-describe('GitHub-proxy site_id entry gate', () => {
+describe('GitHub-relay site_id entry gate', () => {
   it('rejects /auth/github with a site_id that is not in ALLOWED_DOMAINS', async () => {
     const response = await SELF.fetch(
       'https://worker.example.com/auth/github?site_id=attacker.example.net',
@@ -38,7 +37,6 @@ describe('GitHub-proxy site_id entry gate', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.headers.get('location')).toBeNull(); // no outbound redirect
   });
 
   it('rejects /auth/github with no site_id at all', async () => {
@@ -49,13 +47,14 @@ describe('GitHub-proxy site_id entry gate', () => {
     expect(response.status).toBe(404);
   });
 
-  it('still proxies /auth/github for an allowed site_id', async () => {
+  it('renders the relay page for an allowed site_id', async () => {
     const response = await SELF.fetch(
       'https://worker.example.com/auth/github?site_id=cms.example.com',
       { redirect: 'manual' },
     );
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toContain('github.com/login/oauth/authorize');
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('id="start"');
   });
 });

@@ -17,6 +17,21 @@ export interface Texts {
   unsupportedDomain: { title: string; text: string; detailLabel: string };
   accessUnauthorized: { title: string; text: string };
   callbackSuccess: { title: string; text: string };
+  relay: {
+    title: string;
+    intro: string;
+    button: string;
+    status: {
+      waiting: string;
+      signingIn: string;
+    };
+    error: {
+      popupBlocked: string;
+      timeout: string;
+      noOpener: string;
+      upstreamFailed: string;
+    };
+  };
   callbackError: {
     title: string;
     notConnected: string;
@@ -221,6 +236,24 @@ const de: Texts = {
   callbackSuccess: {
     title: 'Anmeldung erfolgreich',
     text: 'Sie werden angemeldet … Dieses Fenster schließt sich gleich von selbst.',
+  },
+  relay: {
+    title: 'Mit GitHub anmelden',
+    intro: 'Ein Klick öffnet den GitHub-Anmeldedienst in einem neuen Fenster.',
+    button: 'Mit GitHub anmelden',
+    status: {
+      waiting: 'Warte auf den GitHub-Anmeldedienst …',
+      signingIn: 'Anmeldung wird abgeschlossen …',
+    },
+    error: {
+      popupBlocked:
+        'Das Anmeldefenster wurde vom Browser blockiert. Bitte Pop-ups für diese Seite erlauben und erneut versuchen.',
+      timeout: 'Zeitüberschreitung: Es kam keine Antwort vom GitHub-Anmeldedienst. Bitte erneut versuchen.',
+      noOpener:
+        'Dieses Fenster wurde nicht korrekt geöffnet (kein Opener-Fenster gefunden). Bitte die Anmeldung erneut über das CMS starten.',
+      upstreamFailed:
+        'Die Anmeldung beim GitHub-Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen; bleibt der Fehler, den Betreiber informieren.',
+    },
   },
   callbackError: {
     title: 'Anmeldung fehlgeschlagen',
@@ -468,6 +501,24 @@ const en: Texts = {
   callbackSuccess: {
     title: 'Signed in successfully',
     text: 'Signing you in … This window will close by itself in a moment.',
+  },
+  relay: {
+    title: 'Sign in with GitHub',
+    intro: 'Click below to open the GitHub sign-in service in a new window.',
+    button: 'Sign in with GitHub',
+    status: {
+      waiting: 'Waiting for the GitHub sign-in service …',
+      signingIn: 'Finishing sign-in …',
+    },
+    error: {
+      popupBlocked:
+        'The sign-in window was blocked by the browser. Please allow pop-ups for this site and try again.',
+      timeout: 'Timed out: no response from the GitHub sign-in service. Please try again.',
+      noOpener:
+        'This window was not opened correctly (no opener window found). Please restart sign-in from the CMS.',
+      upstreamFailed:
+        'Signing in to the GitHub sign-in service failed. Please try again; if the error persists, contact the operator.',
+    },
   },
   callbackError: {
     title: 'Sign-in failed',

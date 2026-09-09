@@ -26,64 +26,6 @@ export default {
         headers: { 'content-type': 'application/json' },
       });
 
-    // Mock des externen sveltia-cms-auth (Option-C-Proxy-Tests).
-    if (url.hostname === 'sveltia-cms-auth.example.net') {
-      // Simuliert einen nicht erreichbaren Upstream (Proxy-Header-Test R4:
-      // die Sicherheitsheader muessen auch auf dem 502-Fehlerpfad stehen).
-      if (url.searchParams.get('simulate_upstream_down') === '1') {
-        throw new Error('simulated upstream network failure');
-      }
-
-      if (url.pathname === '/auth') {
-        const headers = new Headers({
-          location:
-            'https://github.com/login/oauth/authorize?client_id=ext&state=teststate&scope=repo&site=' +
-            (url.searchParams.get('site_id') ?? ''),
-          'set-cookie': 'csrf-token=github_00000000000000000000000000000000; HttpOnly; Path=/; Max-Age=600; SameSite=Lax; Secure',
-        });
-
-        // Proxy-Header-Test R4: ein oeffentlicher Upstream-Cache-Control-Wert
-        // darf den erzwungenen 'no-store' niemals aufweichen.
-        if (url.searchParams.get('simulate_cache') === 'public') {
-          headers.set('cache-control', 'public, max-age=3600');
-        }
-
-        return new Response(null, { status: 302, headers });
-      }
-
-      if (url.pathname === '/callback') {
-        const cookie = request.headers.get('cookie') ?? '';
-        const headers = new Headers({ 'content-type': 'text/html;charset=UTF-8' });
-        headers.append(
-          'set-cookie',
-          'csrf-token=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure',
-        );
-
-        // Feindlicher/kompromittierter Upstream: versucht, ein Access-Cookie im
-        // Browser zu setzen. Der Proxy MUSS das herausfiltern.
-        if (url.searchParams.get('inject') === 'cf') {
-          headers.append('set-cookie', 'CF_Authorization=upstream-injected; Path=/; Secure; HttpOnly');
-        }
-
-        // Proxy-Header-Test R4: ein oeffentlicher Upstream-Cache-Control-Wert
-        // darf den erzwungenen 'no-store' niemals aufweichen.
-        if (url.searchParams.get('simulate_cache') === 'public') {
-          headers.set('cache-control', 'public, max-age=3600');
-        }
-
-        return new Response(
-          '<!doctype html><script>/* authorization:github:success */</script><!-- cookie:' +
-            cookie +
-            ' code:' +
-            (url.searchParams.get('code') ?? '') +
-            ' -->',
-          { status: 200, headers },
-        );
-      }
-
-      return new Response('ext not found', { status: 404 });
-    }
-
     // GitHub API — Konto-Verifikation nach dem Device Flow (auth-v8n3c).
     if (url.hostname === 'api.github.com') {
       const auth = request.headers.get('authorization') ?? '';

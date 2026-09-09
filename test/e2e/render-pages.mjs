@@ -9,7 +9,7 @@ import { build } from 'esbuild';
  * Der Playwright-Guard lädt dieses HTML in echtem Chromium und prüft, dass das
  * Client-JS ohne Fehler lädt/läuft.
  */
-async function loadPagesModule() {
+export async function loadPagesModule() {
   const result = await build({
     stdin: {
       contents: "export * from './src/pages.ts';\nexport { pickTexts } from './src/texts.ts';",
@@ -78,6 +78,7 @@ export async function renderAllPages() {
     add('dashboard', p.renderDashboardPage(config, status, users, events, 'admin@example.com', 'aud-value', t));
     add('dashboard-legacy-account', p.renderDashboardPage(config, statusLegacyAccount, users, events, 'admin@example.com', 'aud-value', t));
     add('callback-success', p.renderCallbackSuccessPage({ provider: 'github', token: 'ghu_bot_token' }, ['cms.example.com'], t));
+    add('github-relay', p.renderGithubRelayPage('https://sveltia-cms-auth.example.net/auth?site_id=cms.example.com&provider=github', 'https://sveltia-cms-auth.example.net', 'cms.example.com', ['cms.example.com'], t));
     add('callback-error', p.renderCallbackErrorPage('Beispiel-Fehler', ['cms.example.com'], t));
     add('selection', p.renderSelectionPage('https://worker.example.com/auth/github?site_id=cms.example.com', 'https://worker.example.com/auth/access?site_id=cms.example.com', 'cms.example.com', t));
     add('setup-connect', p.renderSetupPage(true, now + 3_600_000, 'https://dash.example.com/policy', t));

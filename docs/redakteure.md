@@ -17,6 +17,11 @@ E-Mail-Adresse.
 Die Anmeldung hält etwa eine Woche. Danach fragt das System einfach einmal
 neu nach einem Code.
 
+**Falls „Mit GitHub anmelden" angeboten wird** (nur, wenn der Betreiber das
+eingerichtet hat): Nach dem Klick öffnet sich ein zweites Fenster für die
+eigentliche GitHub-Anmeldung — bitte Pop-ups für diese Seite erlauben, falls
+der Browser das zweite Fenster blockiert.
+
 ## Wenn beim Speichern ein Fehler erscheint
 
 Gelegentlich erneuert das System im Hintergrund Ihre Anmeldung. Falls genau
