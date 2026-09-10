@@ -188,8 +188,10 @@ wizard reads it straight out of your signed-in session (step 5).
 
 ### 5. Configure the worker (two secrets, then the wizard)
 
-Only two values need to be set by hand, ever (ADR 0014 — everything else is
-configured through the browser wizard below, no file edits, no redeploys):
+Only two values need to be set by hand for normal operation (ADR 0014 —
+everything else is configured through the browser wizard below, no file edits,
+no redeploys; the only exception is the optional `SETUP_BOOTSTRAP_AUD` secret
+described further down, used solely for the one-time first-admin bootstrap):
 
 ```json
 {
@@ -365,6 +367,7 @@ it; as the operator you are responsible for handling it under GDPR.
 npm ci
 npm run dev        # wrangler dev
 npm test           # vitest (Workers runtime, mocked upstreams)
+npm run test:e2e   # playwright (two-origin relay handshake, browser)
 npm run typecheck  # tsc --noEmit
 npm run deploy     # wrangler deploy
 ```
