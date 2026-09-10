@@ -120,11 +120,29 @@ async function installMessageProbe(context: import('@playwright/test').BrowserCo
       },
       true,
     );
+    // Companion counter for uncaught errors thrown synchronously while a
+    // `message` listener registered later (e.g. the relay's own
+    // `onUpstreamMessage`) is processing that same message. Needed because
+    // some malformed-payload mutations do not leave the DOM unchanged AND
+    // silent — they instead throw (e.g. `event.data.indexOf is not a
+    // function` when the payload is a non-string object and the relay's own
+    // `typeof event.data !== 'string'` guard has been removed). Without this,
+    // asserting only on DOM state after `waitForNextMessage` cannot
+    // distinguish "guard rejected it cleanly" from "guard missing, handler
+    // blew up" — both leave the DOM untouched.
+    (window as unknown as { __testErrorCount: number }).__testErrorCount = 0;
+    window.addEventListener('error', () => {
+      (window as unknown as { __testErrorCount: number }).__testErrorCount += 1;
+    });
   });
 }
 
 async function probeCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(() => (window as unknown as { __testMessageProbeCount: number }).__testMessageProbeCount);
+}
+
+async function errorCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(() => (window as unknown as { __testErrorCount: number }).__testErrorCount);
 }
 
 async function waitForNextMessage(page: import('@playwright/test').Page, baseline: number): Promise<void> {
@@ -300,6 +318,7 @@ test('adversarial: a success message from a foreign origin is ignored — no tok
   context,
   page,
 }) => {
+  await installMessageProbe(context);
   await registerCommonRoutes(context);
   // Upstream misbehaves/is compromised: instead of the real handshake it
   // navigates its own popup to an attacker-controlled origin and sends the
@@ -330,6 +349,9 @@ test('adversarial: a success message from a foreign origin is ignored — no tok
   await page.locator('#startGithub').click();
   const relayPopup = await relayPopupPromise;
   await relayPopup.waitForLoadState('load');
+  // The malformed (foreign-origin) message is the ONLY message reaching the
+  // relay popup in this test, so the baseline can be taken right here.
+  const baseline = await probeCount(relayPopup);
 
   const upstreamPopupPromise = relayPopup.waitForEvent('popup');
   await relayPopup.locator('#start').click();
@@ -337,12 +359,17 @@ test('adversarial: a success message from a foreign origin is ignored — no tok
   await upstreamPopup.waitForLoadState('load');
   // Wait for the attacker navigation + message attempt to actually happen.
   await upstreamPopup.waitForURL(`${ATTACKER_ORIGIN}/evil`);
-  await page.waitForTimeout(300);
+  // Deterministic sentinel: wait for the relay popup's window to have
+  // actually received (and, per JS single-threaded event dispatch, fully
+  // processed) the foreign-origin message before asserting anything, instead
+  // of a fixed sleep.
+  await waitForNextMessage(relayPopup, baseline);
 
   await expect(page.locator('#result')).toHaveText('');
 });
 
 test('adversarial: non-string postMessage data is ignored by the relay', async ({ context, page }) => {
+  await installMessageProbe(context);
   await registerCommonRoutes(context);
   await context.route(`${UPSTREAM_ORIGIN}/**`, (route) =>
     route.fulfill({
@@ -359,16 +386,30 @@ test('adversarial: non-string postMessage data is ignored by the relay', async (
   await page.locator('#startGithub').click();
   const relayPopup = await relayPopupPromise;
   await relayPopup.waitForLoadState('load');
+  // The malformed (non-string) message is the ONLY message reaching the
+  // relay popup in this test, so the baseline can be taken right here.
+  const baseline = await probeCount(relayPopup);
 
   const upstreamPopupPromise = relayPopup.waitForEvent('popup');
   await relayPopup.locator('#start').click();
   const upstreamPopup = await upstreamPopupPromise;
   await upstreamPopup.waitForLoadState('load');
-  await page.waitForTimeout(300);
+  // Deterministic sentinel: wait for the relay popup's window to have
+  // actually received (and, per JS single-threaded event dispatch, fully
+  // processed) the non-string message before asserting anything, instead of
+  // a fixed sleep.
+  await waitForNextMessage(relayPopup, baseline);
 
   await expect(page.locator('#result')).toHaveText('');
   // The relay page itself must not have crashed/hung on the malformed data.
   await expect(relayPopup.locator('#start')).toBeVisible();
+  // Without the `typeof event.data !== 'string'` guard, the handler still
+  // leaves `#result` empty — but only because it throws (uncaught) trying to
+  // call `.indexOf` on a plain object, not because it deliberately ignored
+  // the payload. `#result` alone can't tell "rejected cleanly" apart from
+  // "guard missing, handler blew up" — both leave the DOM untouched. Assert
+  // no such uncaught error occurred, which the guard's presence guarantees.
+  expect(await errorCount(relayPopup)).toBe(0);
 });
 
 /**
