@@ -12,9 +12,9 @@ function baseConfig(loginDisabled: boolean): LoadedConfig {
     githubAppClientId: 'Iv1.testclientid',
     allowedDomains: ['cms.example.com'],
     githubAuthUrl: undefined,
-    manageEditorsUrl: undefined,
+    manageUsersUrl: undefined,
     githubAuthUrlSkipped: true,
-    manageEditorsUrlSkipped: true,
+    manageUsersUrlSkipped: true,
     loginDisabled,
     setupComplete: true,
   };
@@ -27,13 +27,13 @@ function render(loginDisabled: boolean): Promise<string> {
   return renderDashboardPage(baseConfig(loginDisabled), status, [], [], 'admin@example.com', 'aud-value', t).text();
 }
 
-describe('editor login toggle switch', () => {
+describe('user login toggle switch', () => {
   it('renders a checkbox switch that is CHECKED while login is active', async () => {
     const html = await render(false);
 
     expect(html).toContain('id="loginToggle"');
     expect(html).toContain('type="checkbox"');
-    // The switch reflects the active state: checked = editors can sign in.
+    // The switch reflects the active state: checked = users can sign in.
     const input = html.slice(html.indexOf('id="loginToggle"') - 200, html.indexOf('id="loginToggle"') + 200);
     expect(input).toContain('checked');
   });

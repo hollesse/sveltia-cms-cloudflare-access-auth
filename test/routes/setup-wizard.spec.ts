@@ -50,7 +50,7 @@ function seedFreshDeploymentEnv(): void {
     GITHUB_APP_CLIENT_ID: '',
     ALLOWED_DOMAINS: '',
     GITHUB_AUTH_URL: '',
-    MANAGE_EDITORS_URL: '',
+    MANAGE_USERS_URL: '',
   });
 }
 
@@ -76,7 +76,7 @@ describe('GET /setup — wizard vs. dashboard (ADR 0014)', () => {
       GITHUB_APP_CLIENT_ID: 'Iv1.testclientid',
       ALLOWED_DOMAINS: 'cms.example.com',
       GITHUB_AUTH_URL: '',
-      MANAGE_EDITORS_URL: '',
+      MANAGE_USERS_URL: '',
     });
 
     const connected = await connectBot('https://worker.example.com', await adminHeaders());
@@ -110,7 +110,7 @@ describe('Dashboard-Einstellungen — Pro-Wert-Formulare statt window.prompt() (
       GITHUB_APP_CLIENT_ID: 'Iv1.testclientid',
       ALLOWED_DOMAINS: 'cms.example.com',
       GITHUB_AUTH_URL: '',
-      MANAGE_EDITORS_URL: '',
+      MANAGE_USERS_URL: '',
     });
 
     await connectBot('https://worker.example.com', await adminHeaders());
@@ -290,13 +290,13 @@ describe('Vollstaendiger Wizard-Durchlauf (Acceptance Criterion: frisches Deploy
     expect(await dashboard.text()).toContain('Sveltia CMS Cloudflare Access');
 
     // Und der E-Mail-Login funktioniert (End-to-End ueber SELF.fetch, gemockte Upstreams).
-    const editorToken = await signTestAccessJwt(PRESENTED_AUD, ISSUER, {
-      email: 'redakteurin@example.com',
+    const userToken = await signTestAccessJwt(PRESENTED_AUD, ISSUER, {
+      email: 'nutzerin@example.com',
     });
 
     const login = await SELF.fetch(
       'https://worker.example.com/auth/access?site_id=cms.example.com',
-      { headers: { 'Cf-Access-Jwt-Assertion': editorToken } },
+      { headers: { 'Cf-Access-Jwt-Assertion': userToken } },
     );
 
     expect(login.status).toBe(200);
@@ -385,7 +385,7 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
   });
 
   it('/auth/access refuses cleanly (postMessage error, never hangs) when no AUD is known', async () => {
-    const token = await signTestAccessJwt(PRESENTED_AUD, ISSUER, { email: 'redakteurin@example.com' });
+    const token = await signTestAccessJwt(PRESENTED_AUD, ISSUER, { email: 'nutzerin@example.com' });
 
     const response = await SELF.fetch(
       'https://worker.example.com/auth/access?site_id=cms.example.com',
@@ -437,7 +437,7 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
       method: 'POST', headers, body: JSON.stringify({ skipGithubAuthUrl: true }),
     });
     await SELF.fetch('https://worker.example.com/setup/settings', {
-      method: 'POST', headers, body: JSON.stringify({ skipManageEditorsUrl: true }),
+      method: 'POST', headers, body: JSON.stringify({ skipManageUsersUrl: true }),
     });
     await SELF.fetch('https://worker.example.com/setup/settings', {
       method: 'POST', headers, body: JSON.stringify({ finishWizard: true }),
@@ -446,7 +446,7 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
     expect(await dash.text()).toContain('id="navtoggle"');
   });
 
-  it('records editor logins (first/last seen) and lists them on the dashboard, admin-gated clear works', async () => {
+  it('records user logins (first/last seen) and lists them on the dashboard, admin-gated clear works', async () => {
     seedFreshDeploymentEnv();
     const stub = testEnv.TOKEN_STORE.get(testEnv.TOKEN_STORE.idFromName('bot'));
     await runInDurableObject(stub, (instance: TokenStore) =>
@@ -457,8 +457,8 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
     // Vollstaendige Konfiguration (Anker via env, Rest wie im Migrations-Test).
     Object.assign(testEnv, { ACCESS_APP_AUD: PRESENTED_AUD, GITHUB_APP_CLIENT_ID: 'Iv1.x', ALLOWED_DOMAINS: 'cms.example.com' });
 
-    // Ein Redakteur meldet sich an → Login wird vermerkt.
-    const jwt = await signTestAccessJwt(PRESENTED_AUD, ISSUER, { email: 'redakteurin@example.com' });
+    // Ein Nutzer meldet sich an → Login wird vermerkt.
+    const jwt = await signTestAccessJwt(PRESENTED_AUD, ISSUER, { email: 'nutzerin@example.com' });
     const login = await SELF.fetch('https://worker.example.com/auth/access?site_id=cms.example.com', {
       headers: { 'Cf-Access-Jwt-Assertion': jwt },
     });
@@ -467,7 +467,7 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
     // Dashboard zeigt den Benutzer im Anmeldeverlauf.
     const dash = await SELF.fetch('https://worker.example.com/setup', { headers: await adminHeaders() });
     const html = await dash.text();
-    expect(html).toContain('redakteurin@example.com');
+    expect(html).toContain('nutzerin@example.com');
     expect(html).toContain('id="clearUsersBtn"');
     expect(html.match(/class="localtime"/g)?.length ?? 0).toBeGreaterThanOrEqual(4); // Token-Zeiten + 2 User-Zeiten
 
@@ -475,11 +475,11 @@ describe('GET/POST — Anmeldung ohne bekanntes AUD (ADR 0014)', () => {
     const delOne = await SELF.fetch('https://worker.example.com/setup/users/delete', {
       method: 'POST',
       headers: { ...(await adminHeaders()), 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'redakteurin@example.com' }),
+      body: JSON.stringify({ email: 'nutzerin@example.com' }),
     });
     expect(delOne.status).toBe(200);
     const afterDel = await runInDurableObject(stub, (instance: TokenStore) => instance.listUsers());
-    expect(afterDel.some((u) => u.email === 'redakteurin@example.com')).toBe(false);
+    expect(afterDel.some((u) => u.email === 'nutzerin@example.com')).toBe(false);
 
     // Gesamten Verlauf loeschen (admin-gated).
     const cleared = await SELF.fetch('https://worker.example.com/setup/users/clear', {
@@ -538,12 +538,12 @@ describe('Client-ID-Wechsel entwertet die gespeicherte Autorisierung (auth-g5h9j
       method: 'POST', headers, body: JSON.stringify({ allowedDomains: 'cms.example.com' }),
     });
 
-    const editorToken = await signTestAccessJwt(PRESENTED_AUD, ISSUER, {
-      email: 'redakteurin@example.com',
+    const userToken = await signTestAccessJwt(PRESENTED_AUD, ISSUER, {
+      email: 'nutzerin@example.com',
     });
     const login = await SELF.fetch(
       'https://worker.example.com/auth/access?site_id=cms.example.com',
-      { headers: { 'Cf-Access-Jwt-Assertion': editorToken } },
+      { headers: { 'Cf-Access-Jwt-Assertion': userToken } },
     );
 
     // Kein Token der alten App B — die Autorisierung wurde beim Wechsel entwertet.

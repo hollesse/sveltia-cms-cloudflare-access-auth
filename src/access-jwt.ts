@@ -44,7 +44,7 @@ export type AccessJwtValidationResult = AccessJwtValidationSuccess | AccessJwtVa
  * `accessAppAud` ist OPTIONAL (ADR 0014, TOFU-AUD-Wizard): fehlt es, wird
  * Signatur + `iss` + `exp` dennoch vollstaendig geprueft, nur die Audience-
  * Pruefung entfaellt. Genutzt ausschliesslich fuer den allerersten
- * Setup-Schritt, bevor ein AUD gepinnt ist — der Redakteurs-Login
+ * Setup-Schritt, bevor ein AUD gepinnt ist — der Nutzer-Login
  * (`/auth/access`) verlangt IMMER ein bekanntes AUD und ruft diese Funktion
  * dafuer nie ohne `accessAppAud` auf.
  */

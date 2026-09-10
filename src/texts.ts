@@ -141,7 +141,7 @@ export interface Texts {
     fieldGithubAppClientId: string;
     fieldAllowedDomains: string;
     fieldGithubAuthUrl: string;
-    fieldManageEditorsUrl: string;
+    fieldManageUsersUrl: string;
     notSet: string;
     editTitle: string;
     saveButton: string;
@@ -277,7 +277,7 @@ const de: Texts = {
     manageHint:
       'Öffnet die Access-Policy (Regel <em>Include &rarr; Emails</em>): Adresse hinzufügen/entfernen, speichern — Entzug wirkt nach Ablauf von Access-Session + Token.',
     manageFallback:
-      'Im Cloudflare-Dashboard: Konto &rarr; Zero Trust &rarr; Access controls &rarr; Policies &rarr; CMS-Policy &rarr; Regel <em>Include &rarr; Emails</em>. Tipp: die Policy-URL als <code>MANAGE_EDITORS_URL</code> konfigurieren, dann erscheint hier ein Button.',
+      'Im Cloudflare-Dashboard: Konto &rarr; Zero Trust &rarr; Access controls &rarr; Policies &rarr; CMS-Policy &rarr; Regel <em>Include &rarr; Emails</em>. Tipp: die Policy-URL als <code>MANAGE_USERS_URL</code> konfigurieren, dann erscheint hier ein Button.',
     connectTitle: 'GitHub-Verbindung',
     connectIntro:
       'Diese Einrichtung einmalig als <strong>Bot-Account</strong> durchführen (nicht mit dem persönlichen GitHub-Account!): Der Bot muss Collaborator des Ziel-Repos sein und die GitHub App autorisieren.',
@@ -409,7 +409,7 @@ const de: Texts = {
     fieldGithubAppClientId: 'Client-ID der GitHub App',
     fieldAllowedDomains: 'Erlaubte Domains',
     fieldGithubAuthUrl: 'sveltia-cms-auth-URL',
-    fieldManageEditorsUrl: 'Benutzer verwalten (Cloudflare-Link)',
+    fieldManageUsersUrl: 'Benutzer verwalten (Cloudflare-Link)',
     notSet: 'nicht gesetzt',
     editTitle: 'Ändern',
     saveButton: 'Speichern',
@@ -542,7 +542,7 @@ const en: Texts = {
     manageHint:
       'Opens the Access policy (rule <em>Include &rarr; Emails</em>): add or remove an address and save — removal takes effect after the Access session + token expire.',
     manageFallback:
-      'In the Cloudflare dashboard: account &rarr; Zero Trust &rarr; Access controls &rarr; Policies &rarr; the CMS policy &rarr; rule <em>Include &rarr; Emails</em>. Tip: configure the policy URL as <code>MANAGE_EDITORS_URL</code> to get a button here.',
+      'In the Cloudflare dashboard: account &rarr; Zero Trust &rarr; Access controls &rarr; Policies &rarr; the CMS policy &rarr; rule <em>Include &rarr; Emails</em>. Tip: configure the policy URL as <code>MANAGE_USERS_URL</code> to get a button here.',
     connectTitle: 'GitHub connection',
     connectIntro:
       'Do this once as the <strong>bot account</strong> (not your personal GitHub account!): the bot must be a collaborator on the target repository and authorize the GitHub App.',
@@ -671,7 +671,7 @@ const en: Texts = {
     fieldGithubAppClientId: 'GitHub App client ID',
     fieldAllowedDomains: 'Allowed domains',
     fieldGithubAuthUrl: 'sveltia-cms-auth URL',
-    fieldManageEditorsUrl: 'Manage users (Cloudflare link)',
+    fieldManageUsersUrl: 'Manage users (Cloudflare link)',
     notSet: 'not set',
     editTitle: 'Change',
     saveButton: 'Save',

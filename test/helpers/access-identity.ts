@@ -26,7 +26,7 @@ export async function signTestAccessJwt(
   const alg = options.alg ?? 'RS256';
   const kid = options.kid === undefined ? fixtureKid : (options.kid ?? undefined);
 
-  const jwt = new SignJWT({ email: options.email ?? 'redakteurin@example.com' })
+  const jwt = new SignJWT({ email: options.email ?? 'nutzerin@example.com' })
     .setProtectedHeader(kid ? { alg, kid } : { alg })
     .setIssuedAt(now)
     .setExpirationTime(now + (options.expiresInSeconds ?? 300))

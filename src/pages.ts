@@ -358,7 +358,7 @@ export function renderUnsupportedDomainPage(t: Texts): Response {
 export function renderSetupPage(
   authorized: boolean,
   expiresAt: number | null,
-  manageEditorsUrl: string | undefined,
+  manageUsersUrl: string | undefined,
   t: Texts,
 ): Response {
   const statusLine = authorized
@@ -370,8 +370,8 @@ export function renderSetupPage(
 ${statusLine}
 <h2>${t.setup.manageTitle}</h2>
 ${
-  manageEditorsUrl
-    ? `<a class="way way-secondary" href="${escapeHtmlAttribute(manageEditorsUrl)}" target="_blank" rel="noopener" title="${escapeHtmlAttribute(t.setup.manageButtonTitle)}">${ICON_USERS}<span>${t.setup.manageButton}</span></a>
+  manageUsersUrl
+    ? `<a class="way way-secondary" href="${escapeHtmlAttribute(manageUsersUrl)}" target="_blank" rel="noopener" title="${escapeHtmlAttribute(t.setup.manageButtonTitle)}">${ICON_USERS}<span>${t.setup.manageButton}</span></a>
 <p class="muted">${t.setup.manageHint}</p>`
     : `<p class="muted">${t.setup.manageFallback}</p>`
 }
@@ -974,7 +974,7 @@ document.getElementById('step4skip').addEventListener('click', function () {
 </script>`;
   }
 
-  if (step === 6) { // Inhalt: w.step5 (Redakteure-Link, optional)
+  if (step === 6) { // Inhalt: w.step5 (Nutzer-Link, optional)
     return `<div class="card">
 <h2>${w.step5.title}</h2>
 <p>${w.step5.intro}</p>
@@ -988,12 +988,12 @@ document.getElementById('step4skip').addEventListener('click', function () {
 <script>
 document.getElementById('step5save').addEventListener('click', function () {
   var url = document.getElementById('manageUrl').value.trim();
-  postSettings({ manageEditorsUrl: url }, function (reason) {
+  postSettings({ manageUsersUrl: url }, function (reason) {
     alert(reason === 'invalid_url' ? ${JSON.stringify(w.step5.invalidUrl)} : ${JSON.stringify(w.errorPrefix)} + reason);
   });
 });
 document.getElementById('step5skip').addEventListener('click', function () {
-  postSettings({ skipManageEditorsUrl: true }, function (reason) {
+  postSettings({ skipManageUsersUrl: true }, function (reason) {
     alert(${JSON.stringify(w.errorPrefix)} + reason);
   });
 });
@@ -1126,8 +1126,8 @@ export function renderDashboardPage(
 ): Response {
   const d = t.dashboard;
 
-  const manageBtn = config.manageEditorsUrl
-    ? `<a class="btn btn-primary" href="${escapeHtmlAttribute(config.manageEditorsUrl)}" target="_blank" rel="noopener">${ICON_USERS}<span>${t.setup.manageButton}</span></a>`
+  const manageBtn = config.manageUsersUrl
+    ? `<a class="btn btn-primary" href="${escapeHtmlAttribute(config.manageUsersUrl)}" target="_blank" rel="noopener">${ICON_USERS}<span>${t.setup.manageButton}</span></a>`
     : `<p class="muted">${t.setup.manageFallback}</p>`;
 
   const userRows = users
@@ -1315,12 +1315,12 @@ ${settingsRow(
   textEditForm('githubAuthUrl', config.githubAuthUrl ?? '', d.urlPlaceholder, d.saveButton, d.cancelButton),
 )}
 ${settingsRow(
-  d.fieldManageEditorsUrl,
-  config.manageEditorsUrl,
+  d.fieldManageUsersUrl,
+  config.manageUsersUrl,
   d.notSet,
-  'manageEditorsUrl',
+  'manageUsersUrl',
   d.editTitle,
-  textEditForm('manageEditorsUrl', config.manageEditorsUrl ?? '', d.urlPlaceholder, d.saveButton, d.cancelButton),
+  textEditForm('manageUsersUrl', config.manageUsersUrl ?? '', d.urlPlaceholder, d.saveButton, d.cancelButton),
 )}
 </div>
 <p class="muted" style="margin-top:16px">${d.settingsFootnote}</p>

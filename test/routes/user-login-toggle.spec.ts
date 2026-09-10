@@ -60,7 +60,7 @@ afterEach(() => {
   Object.assign(testEnv, originalEnv);
 });
 
-describe('editor login toggle', () => {
+describe('user login toggle', () => {
   it('withholds the token when login is disabled, even with a valid Access-JWT', async () => {
     await seedBotToken();
     await setLoginDisabled(true);

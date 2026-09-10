@@ -55,20 +55,20 @@ export interface StoredSettings {
   githubAppClientId?: string;
   allowedDomains?: string[];
   githubAuthUrl?: string;
-  manageEditorsUrl?: string;
+  manageUsersUrl?: string;
   githubAuthUrlSkipped?: boolean;
   /** Vom Fertig-Schritt des Wizards gesetzt (ADR 0014): Wizard durchlaufen. */
   wizardDone?: boolean;
-  manageEditorsUrlSkipped?: boolean;
+  manageUsersUrlSkipped?: boolean;
   /**
    * Explizit deaktiviert: der Betreiber hat die URL im Dashboard geleert. Anders
    * als "nicht gesetzt" unterdrueckt dies den gleichnamigen Env-Fallback, sodass
    * ein migriertes Deployment die Funktion wirklich abschalten kann.
    */
   githubAuthUrlDisabled?: boolean;
-  manageEditorsUrlDisabled?: boolean;
+  manageUsersUrlDisabled?: boolean;
   /**
-   * Redakteur-Login deaktiviert: solange gesetzt, gibt `/auth/access` KEIN
+   * Nutzer-Login deaktiviert: solange gesetzt, gibt `/auth/access` KEIN
    * Bot-Token mehr aus — auch bei gueltigem Access-JWT und noch laufender
    * Session. Nutzbar als geplanter Wartungsschalter oder als Sofort-Notbremse.
    * Der interne Cron-Refresh laeuft unberuehrt weiter; deaktiviert ist nur die
@@ -100,7 +100,7 @@ export interface PendingDeviceFlow {
   expiresAt: number;
 }
 
-/** Login-Historie eines Redakteurs (Betriebs-/Audit-Log, ADR 0015). */
+/** Login-Historie eines Nutzers (Betriebs-/Audit-Log, ADR 0015). */
 export interface UserRecord {
   email: string;
   firstSeen: number;
@@ -249,7 +249,7 @@ export class TokenStore extends DurableObject<Env> {
   }
 
   /**
-   * Vermerkt einen erfolgreichen Redakteurs-Login (E-Mail aus dem
+   * Vermerkt einen erfolgreichen Nutzer-Login (E-Mail aus dem
    * validierten Access-JWT). Upsert: firstSeen bleibt, lastSeen wird
    * aktualisiert. Bewusste, dokumentierte Persistenz-Ausnahme (ADR 0015).
    */
@@ -266,7 +266,7 @@ export class TokenStore extends DurableObject<Env> {
     await this.ctx.storage.put(USERS_KEY, users);
   }
 
-  /** Liste aller je angemeldeten Redakteure (neueste Aktivitaet zuerst). */
+  /** Liste aller je angemeldeten Nutzer (neueste Aktivitaet zuerst). */
   async listUsers(): Promise<UserRecord[]> {
     const users = (await this.ctx.storage.get<Record<string, UserRecord>>(USERS_KEY)) ?? {};
     return Object.values(users).sort((a, b) => b.lastSeen - a.lastSeen);

@@ -190,7 +190,7 @@ test('happy path: full double handshake delivers the token to the fake CMS, the 
   // The upstream callback window never closes itself and the CMS only closes
   // its OWN popup (the relay page P) — so the relay must close the upstream
   // window once the result arrived (src/pages.ts finish()). Without that the
-  // editor is left staring at a blank upstream tab after every login.
+  // user is left staring at a blank upstream tab after every login.
   await expect.poll(() => upstreamPopup.isClosed(), { timeout: 10_000 }).toBe(true);
 });
 

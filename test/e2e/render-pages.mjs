@@ -38,9 +38,9 @@ export async function renderAllPages() {
     githubAppClientId: 'Iv1.testclientid',
     allowedDomains: ['cms.example.com'],
     githubAuthUrl: 'https://sveltia-cms-auth.example.net',
-    manageEditorsUrl: 'https://dash.example.com/policy',
+    manageUsersUrl: 'https://dash.example.com/policy',
     githubAuthUrlSkipped: false,
-    manageEditorsUrlSkipped: false,
+    manageUsersUrlSkipped: false,
     loginDisabled: false,
     setupComplete: true,
   };
@@ -58,7 +58,7 @@ export async function renderAllPages() {
     ...status,
     account: { login: 'legacy-cms-bot', installations: 3 },
   };
-  const users = [{ email: 'redakteurin@example.com', firstSeen: now - 100_000, lastSeen: now }];
+  const users = [{ email: 'nutzerin@example.com', firstSeen: now - 100_000, lastSeen: now }];
   const events = [
     { type: 'settings_updated', actor: 'admin@example.com', at: now - 200_000, detail: 'allowedDomains' },
     { type: 'bot_connected', actor: 'admin@example.com', at: now - 100_000 },

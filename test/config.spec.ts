@@ -52,7 +52,7 @@ describe('buildLoadedConfig', () => {
       GITHUB_APP_CLIENT_ID: 'env-client-id',
       ALLOWED_DOMAINS: 'cms.example.com, other.example.org',
       GITHUB_AUTH_URL: 'https://auth.example.net',
-      MANAGE_EDITORS_URL: 'https://dash.example.com/policy',
+      MANAGE_USERS_URL: 'https://dash.example.com/policy',
     });
 
     expect(config).toMatchObject({
@@ -60,7 +60,7 @@ describe('buildLoadedConfig', () => {
       githubAppClientId: 'env-client-id',
       allowedDomains: ['cms.example.com', 'other.example.org'],
       githubAuthUrl: 'https://auth.example.net',
-      manageEditorsUrl: 'https://dash.example.com/policy',
+      manageUsersUrl: 'https://dash.example.com/policy',
       setupComplete: true,
     });
   });

@@ -31,9 +31,9 @@ export interface Env {
   /**
    * Optional: Deep-Link zur Access-Policy der CMS-Applikation im Cloudflare-
    * Dashboard (account-/policy-spezifisch, daher Konfiguration statt Code).
-   * Wird auf der Setup-Seite als "Redakteure verwalten"-Link angezeigt.
+   * Wird auf der Setup-Seite als "Nutzer verwalten"-Link angezeigt.
    */
-  MANAGE_EDITORS_URL?: string;
+  MANAGE_USERS_URL?: string;
   /** Durable-Object-Binding: Tresor fuer das Bot-Token-Paar (ADR 0011). */
   TOKEN_STORE: DurableObjectNamespace<TokenStore>;
 }

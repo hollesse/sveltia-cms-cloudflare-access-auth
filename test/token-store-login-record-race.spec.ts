@@ -54,7 +54,7 @@ describe('TokenStore.getAccessTokenForLogin closes the recordLogin-after-decisio
         return Response.json({ access_token: 'ghu_fresh', refresh_token: 'refresh-fresh', expires_in: 28800 });
       }) as typeof fetch;
       try {
-        const pending = instance.getAccessTokenForLogin('client-id', 'editor@example.com', Date.now());
+        const pending = instance.getAccessTokenForLogin('client-id', 'user@example.com', Date.now());
         await started;
         // Sperre greift waehrend des Notfall-Refreshs desselben Roundtrips —
         // exakt das enge Fenster, das frueher zwischen den zwei getrennten
@@ -77,12 +77,12 @@ describe('TokenStore.getAccessTokenForLogin closes the recordLogin-after-decisio
   it('still issues a token AND records the login for a regular, unlocked login', async () => {
     const [result, users] = await runInDurableObject(bot(), async (instance: TokenStore) => {
       await instance.storeAuthorization(freshPair('ghu_bot_token', 'refresh-ok'));
-      const tokenResult = await instance.getAccessTokenForLogin('client-id', 'editor@example.com', Date.now());
+      const tokenResult = await instance.getAccessTokenForLogin('client-id', 'user@example.com', Date.now());
       return [tokenResult, await instance.listUsers()] as const;
     });
 
     expect(result).toEqual({ ok: true, token: 'ghu_bot_token' });
     expect(users).toHaveLength(1);
-    expect(users[0]?.email).toBe('editor@example.com');
+    expect(users[0]?.email).toBe('user@example.com');
   });
 });

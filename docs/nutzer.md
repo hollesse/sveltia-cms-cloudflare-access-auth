@@ -1,4 +1,4 @@
-# Anleitung für Redakteurinnen und Redakteure
+# Anleitung für Nutzerinnen und Nutzer
 
 Sie brauchen **kein GitHub-Konto** und **kein Passwort** — nur Ihre
 E-Mail-Adresse.
@@ -43,6 +43,6 @@ bitte immer abmelden.
 
 ---
 
-*Für Betreiber: Diese Datei können Sie Ihren Redakteuren geben oder auf Ihrer
+*Für Betreiber: Diese Datei können Sie Ihren Nutzern geben oder auf Ihrer
 Website verlinken. Freischalten/Entfernen von Adressen: siehe README,
 Abschnitt „Operations".*

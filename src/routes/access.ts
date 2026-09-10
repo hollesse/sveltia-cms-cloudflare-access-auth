@@ -45,7 +45,7 @@ export async function handleAuthAccess(request: Request, env: Env): Promise<Resp
     return renderAccessUnauthorizedPage(t);
   }
 
-  // Redakteur-Login deaktiviert (Wartung/Notfall): selbst mit gueltigem
+  // Nutzer-Login deaktiviert (Wartung/Notfall): selbst mit gueltigem
   // Access-JWT wird kein Token herausgegeben (kein Tokenwert im Body) — sofort
   // wirksam, ohne auf Session- oder Token-Ablauf zu warten.
   if (config.loginDisabled) {

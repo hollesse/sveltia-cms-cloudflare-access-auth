@@ -70,9 +70,9 @@ describe('Wizard final step renders valid script markup', () => {
     githubAppClientId: 'Iv1.testclientid',
     allowedDomains: ['cms.example.com'],
     githubAuthUrl: undefined,
-    manageEditorsUrl: undefined,
+    manageUsersUrl: undefined,
     githubAuthUrlSkipped: true,
-    manageEditorsUrlSkipped: true,
+    manageUsersUrlSkipped: true,
     loginDisabled: false,
     setupComplete: true,
   };

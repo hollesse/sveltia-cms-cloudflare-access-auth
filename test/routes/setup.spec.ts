@@ -45,9 +45,9 @@ describe('/setup/github', () => {
     ).toBe(401);
   });
 
-  it('rejects an authenticated editor who is not a setup admin (role gate, ADR 0012)', async () => {
+  it('rejects an authenticated user who is not a setup admin (role gate, ADR 0012)', async () => {
     const response = await SELF.fetch('https://worker.example.com/setup/github', {
-      headers: await authedHeaders('redakteurin@example.com'),
+      headers: await authedHeaders('nutzerin@example.com'),
     });
 
     expect(response.status).toBe(403);
@@ -84,11 +84,11 @@ describe('/setup/github', () => {
     expect(response.status).toBe(200);
     const body = await response.text();
     expect(body).toContain('Mit GitHub verbinden');
-    expect(body).toContain('MANAGE_EDITORS_URL');
+    expect(body).toContain('MANAGE_USERS_URL');
   });
 
-  it('links directly to the editors policy when MANAGE_EDITORS_URL is set', async () => {
-    testEnv.MANAGE_EDITORS_URL =
+  it('links directly to the users policy when MANAGE_USERS_URL is set', async () => {
+    testEnv.MANAGE_USERS_URL =
       'https://dash.cloudflare.com/acc/one/access-controls/policies/pol/edit';
 
     const response = await SELF.fetch('https://worker.example.com/setup/github', {

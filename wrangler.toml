@@ -31,7 +31,7 @@ keep_vars = true
 # hat Vorrang. Neue Deployments muessen diese Variablen NICHT mehr setzen:
 #
 #   GITHUB_APP_CLIENT_ID, ACCESS_APP_AUD, ALLOWED_DOMAINS, GITHUB_AUTH_URL,
-#   MANAGE_EDITORS_URL — je per `wrangler secret put`, wenn gebraucht.
+#   MANAGE_USERS_URL — je per `wrangler secret put`, wenn gebraucht.
 
 # Token-Rotation (ADR 0011): Der Cron ist der einzige regulaere Refresher
 # des Bot-Tokens (Single-Writer, 0/6/12/18 Uhr UTC; Access-Token leben 8 h,

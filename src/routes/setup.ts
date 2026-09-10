@@ -50,8 +50,8 @@ function currentWizardStep(
   allowedDomains: string[],
   githubAuthUrl: string | undefined,
   githubAuthUrlSkipped: boolean,
-  manageEditorsUrl: string | undefined,
-  manageEditorsUrlSkipped: boolean,
+  manageUsersUrl: string | undefined,
+  manageUsersUrlSkipped: boolean,
 ): 1 | 2 | 3 | 4 | 5 | 6 | 7 {
   if (accessAppAud === undefined) {
     return 1;
@@ -73,7 +73,7 @@ function currentWizardStep(
     return 5;
   }
 
-  if (manageEditorsUrl === undefined && !manageEditorsUrlSkipped) {
+  if (manageUsersUrl === undefined && !manageUsersUrlSkipped) {
     return 6;
   }
 
@@ -85,9 +85,9 @@ interface SettingsUpdateBody {
   githubAppClientId?: string;
   allowedDomains?: string;
   githubAuthUrl?: string;
-  manageEditorsUrl?: string;
+  manageUsersUrl?: string;
   skipGithubAuthUrl?: boolean;
-  skipManageEditorsUrl?: boolean;
+  skipManageUsersUrl?: boolean;
   finishWizard?: boolean;
 }
 
@@ -157,15 +157,15 @@ async function handleUpdateSettings(
     }
   }
 
-  if (body.manageEditorsUrl !== undefined) {
-    if (body.manageEditorsUrl === '') {
-      partial.manageEditorsUrl = undefined;
-      partial.manageEditorsUrlDisabled = true;
-    } else if (!isValidHttpsUrl(body.manageEditorsUrl)) {
+  if (body.manageUsersUrl !== undefined) {
+    if (body.manageUsersUrl === '') {
+      partial.manageUsersUrl = undefined;
+      partial.manageUsersUrlDisabled = true;
+    } else if (!isValidHttpsUrl(body.manageUsersUrl)) {
       return Response.json({ ok: false, reason: 'invalid_url' }, { status: 400 });
     } else {
-      partial.manageEditorsUrl = body.manageEditorsUrl;
-      partial.manageEditorsUrlDisabled = false;
+      partial.manageUsersUrl = body.manageUsersUrl;
+      partial.manageUsersUrlDisabled = false;
     }
   }
 
@@ -173,8 +173,8 @@ async function handleUpdateSettings(
     partial.githubAuthUrlSkipped = true;
   }
 
-  if (body.skipManageEditorsUrl === true) {
-    partial.manageEditorsUrlSkipped = true;
+  if (body.skipManageUsersUrl === true) {
+    partial.manageUsersUrlSkipped = true;
   }
 
   if (body.finishWizard === true) {
@@ -317,8 +317,8 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
         config.allowedDomains,
         config.githubAuthUrl,
         config.githubAuthUrlSkipped,
-        config.manageEditorsUrl,
-        config.manageEditorsUrlSkipped,
+        config.manageUsersUrl,
+        config.manageUsersUrlSkipped,
       );
 
       return renderWizardPage(step, config, email, presentedAud, url.origin, t);
@@ -336,7 +336,7 @@ export async function handleSetup(request: Request, env: Env): Promise<Response>
   if (url.pathname === '/setup/github' && request.method === 'GET') {
     const status = await tokenStore.status();
 
-    return renderSetupPage(status.authorized, status.expiresAt, config.manageEditorsUrl, t);
+    return renderSetupPage(status.authorized, status.expiresAt, config.manageUsersUrl, t);
   }
 
   const clientId = config.githubAppClientId;

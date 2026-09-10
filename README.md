@@ -3,13 +3,13 @@
 [![CI](https://github.com/hollesse/sveltia-cms-cloudflare-access-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/hollesse/sveltia-cms-cloudflare-access-auth/actions/workflows/ci.yml)
 
 **Email-based login for [Sveltia CMS](https://github.com/sveltia/sveltia-cms)
-(and Decap-compatible CMSs) — no GitHub account required for your editors.**
+(and Decap-compatible CMSs) — no GitHub account required for your users.**
 
 A single, stateless Cloudflare Worker that acts as the CMS's authentication
-backend (`base_url`). Editors sign in with nothing but their email address:
+backend (`base_url`). Users sign in with nothing but their email address:
 Cloudflare Access sends them a one-time code, checks it against your allowlist,
 and the worker hands the CMS a **short-lived GitHub token (8 hours)** minted
-from a bot account's GitHub App authorization. Optionally, editors with a
+from a bot account's GitHub App authorization. Optionally, users with a
 GitHub account can keep signing in with GitHub via your existing
 [`sveltia-cms-auth`](https://github.com/sveltia/sveltia-cms-auth) deployment.
 
@@ -49,8 +49,8 @@ What that means for you as the operator:
 
 - **No per-person attribution on the email path.** Every commit made through
   the email login is authored by the bot account. You **cannot tell from the
-  git history which editor wrote a given change** — the history shows the bot,
-  not the person. If you need real per-author commits, have those editors use
+  git history which user wrote a given change** — the history shows the bot,
+  not the person. If you need real per-author commits, have those users use
   the optional *personal GitHub* sign-in path instead (see below), where each
   commit carries their own GitHub identity.
 - **Everyone gets the same permissions.** The email path grants exactly the
@@ -63,7 +63,7 @@ What that means for you as the operator:
 
 **Token lifetimes and where tokens live:**
 
-- The token handed to an editor's browser **expires after 8 hours**. Like every
+- The token handed to a user's browser **expires after 8 hours**. Like every
   git-based CMS, Sveltia keeps it in the browser's `localStorage` unencrypted.
   The short life bounds the exposure window, but the token is the bot's full
   GitHub token (repo read/write, not limited to CMS actions): a leaked token can
@@ -84,7 +84,7 @@ They lose access after at most *(Access session length, default 1 week) + 8
 hours*. On a suspected leak, click *Rotate token now* in the dashboard: GitHub
 invalidates the previously issued bot token immediately, so any copied bot token
 stops working. Note what rotation does **not** do — it does not end Cloudflare
-Access sessions (an editor still signed in can fetch a fresh token, so remove
+Access sessions (a user still signed in can fetch a fresh token, so remove
 them from the Access policy too) and does not touch personal GitHub sign-in
 tokens. Shortening the Access session length reduces the offboarding delay.
 
@@ -109,11 +109,11 @@ unset for the default behaviour above. Single-app deployments (the common case)
 don't need it; it matters only when you share a team domain with weaker apps.
 
 **The personal-GitHub alternative.** If you enable the optional GitHub sign-in
-path (delegated to `sveltia-cms-auth`, see below), editors using it sign in with
+path (delegated to `sveltia-cms-auth`, see below), users using it sign in with
 their own GitHub account: commits are attributed to them personally, but that
 path uses GitHub's classic long-lived token (no 8-hour expiry). It is the
 opposite trade-off — real attribution, longer-lived browser token. You can
-offer both paths at once; each editor picks per login.
+offer both paths at once; each user picks per login.
 
 ## Prerequisites
 
@@ -176,9 +176,9 @@ Paths act as prefixes, so `setup` covers all setup routes. `/auth` (the
 method-selection page) stays public by design.
 
 - Login method: **One-time PIN** (default).
-- Policy: Allow → Include → **Emails** → your editors' addresses, *plus*
+- Policy: Allow → Include → **Emails** → your users' addresses, *plus*
   yourself as the operator (you'll need it in step 5, the setup wizard).
-  This policy IS your editor allowlist; Access won't even send a code to
+  This policy IS your user allowlist; Access won't even send a code to
   addresses that aren't on it.
 - Session duration: 1 week is a good balance (offboarding takes effect within
   session + 8 h).
@@ -249,17 +249,18 @@ backend:
   auth_methods: [oauth]   # hides Sveltia's "Sign In Using Access Token"
 ```
 
-That's it. Editors click the CMS sign-in button, get the method page (or go
+That's it. Users click the CMS sign-in button, get the method page (or go
 straight to the email flow if GitHub isn't configured), enter their one-time
 code, and are signed in.
 
 ## Optional: keep GitHub sign-in via sveltia-cms-auth
 
-If some editors prefer their personal GitHub account, the worker can delegate
+If some users prefer their personal GitHub account, the worker can delegate
 that path to a `sveltia-cms-auth` deployment. Since ADR 0017, this runs as a
-**postMessage relay** (§7.6 option B), not a pass-through proxy: `/auth/github`
-is the worker's own page. A click opens `sveltia-cms-auth` in a *second* popup
-on its own origin, and only postMessage *data* — never HTML or script — crosses
+**postMessage relay** (§7.6 option B), not a pass-through proxy: the GitHub
+button on the selection page opens `sveltia-cms-auth` directly in a *second*
+popup on its own origin (`/auth/github` no longer exists on the worker — it
+returns 404), and only postMessage *data* — never HTML or script — crosses
 back to the worker's origin. Set up both configuration steps together, at
 deploy time — the GitHub sign-in path is broken between step 1 and step 2:
 
@@ -309,12 +310,12 @@ adding happens only in the Access policy.
 can open `/setup`; everyone else gets "access denied". Change it with
 `wrangler secret put SETUP_ADMINS` (comma-separated).
 
-**Tokens (normally nothing to do).** The service hands each editor a token that
+**Tokens (normally nothing to do).** The service hands each user a token that
 expires after 8 hours and refreshes itself automatically four times a day
 (00/06/12/18 UTC), so it never goes stale — even if the site is untouched for
 months. If a refresh happens while someone is mid-edit, they simply see a
 save error, reload, sign in again (a two-second popup), and their draft is
-still there — see [docs/redakteure.md](docs/redakteure.md).
+still there — see [docs/nutzer.md](docs/nutzer.md).
 
 **If you suspect a token leaked.** Click *Rotate token now* in the dashboard —
 every token currently out there stops working immediately. Note that a still-valid
@@ -334,7 +335,7 @@ authorization (e.g. the bot account changed its password). The login shows a
 clear error; fix it by clicking *Reconnect* in the dashboard's GitHub section
 and re-authorizing as the bot.
 
-**Privacy note.** The sign-in history stores editors' email addresses and
+**Privacy note.** The sign-in history stores users' email addresses and
 timestamps (personal data). Use *Clear history* or per-user delete to remove
 it; as the operator you are responsible for handling it under GDPR.
 
@@ -346,12 +347,12 @@ it; as the operator you are responsible for handling it under GDPR.
 | "Setup incomplete" page, links to `/setup` | AUD or GitHub Client ID aren't pinned yet — finish the wizard. |
 | Device-flow start fails with `github_error_400` | Device Flow not enabled on the GitHub App (step 2). |
 | `UNSUPPORTED_DOMAIN` | The requesting site isn't in the wizard's/dashboard's allowed domains. |
-| Editor sees "Bad credentials" when saving | Token rotated mid-session — reload, sign in again, restore the draft (see editor guide). |
+| User sees "Bad credentials" when saving | Token rotated mid-session — reload, sign in again, restore the draft (see user guide). |
 | Everything asks for an email code, even `/auth` | Your Access app targets the whole worker ("Workers" destination). Recreate it with public-hostname entries and paths (step 4). |
 
 ## Notes
 
-- Editor-facing pages are bilingual: German for German browser locales,
+- User-facing pages are bilingual: German for German browser locales,
   English otherwise (Accept-Language; no header defaults to German). All
   strings live in `src/texts.ts` — adding a locale is one object.
 - Commits made via the email path are attributed to the bot account. That's

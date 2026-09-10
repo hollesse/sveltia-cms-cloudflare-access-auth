@@ -138,7 +138,7 @@ export function parseAndValidateDomains(raw: string): DomainsValidationResult {
   return { ok: true, domains: parts };
 }
 
-/** `https://…`-Validierung fuer `githubAuthUrl`/`manageEditorsUrl`. */
+/** `https://…`-Validierung fuer `githubAuthUrl`/`manageUsersUrl`. */
 export function isValidHttpsUrl(value: string): boolean {
   try {
     return new URL(value).protocol === 'https:';
@@ -155,10 +155,10 @@ export interface LoadedConfig {
   githubAppClientId: string | undefined;
   allowedDomains: string[];
   githubAuthUrl: string | undefined;
-  manageEditorsUrl: string | undefined;
+  manageUsersUrl: string | undefined;
   githubAuthUrlSkipped: boolean;
-  manageEditorsUrlSkipped: boolean;
-  /** Redakteur-Login deaktiviert: `/auth/access` gibt keine Bot-Tokens mehr aus. */
+  manageUsersUrlSkipped: boolean;
+  /** Nutzer-Login deaktiviert: `/auth/access` gibt keine Bot-Tokens mehr aus. */
   loginDisabled: boolean;
   /** AUD + Client-ID gepinnt/bekannt UND mind. eine erlaubte Domain (Wizard-Schritte 1-3). */
   setupComplete: boolean;
@@ -183,9 +183,9 @@ export function buildLoadedConfig(
   const githubAuthUrl = settings.githubAuthUrlDisabled
     ? undefined
     : firstNonBlank(settings.githubAuthUrl, env.GITHUB_AUTH_URL);
-  const manageEditorsUrl = settings.manageEditorsUrlDisabled
+  const manageUsersUrl = settings.manageUsersUrlDisabled
     ? undefined
-    : firstNonBlank(settings.manageEditorsUrl, env.MANAGE_EDITORS_URL);
+    : firstNonBlank(settings.manageUsersUrl, env.MANAGE_USERS_URL);
 
   return {
     ok: true,
@@ -195,9 +195,9 @@ export function buildLoadedConfig(
     githubAppClientId,
     allowedDomains,
     githubAuthUrl,
-    manageEditorsUrl,
+    manageUsersUrl,
     githubAuthUrlSkipped: settings.githubAuthUrlSkipped === true,
-    manageEditorsUrlSkipped: settings.manageEditorsUrlSkipped === true,
+    manageUsersUrlSkipped: settings.manageUsersUrlSkipped === true,
     loginDisabled: settings.loginDisabled === true,
     setupComplete:
       accessAppAud !== undefined && githubAppClientId !== undefined && allowedDomains.length > 0,
